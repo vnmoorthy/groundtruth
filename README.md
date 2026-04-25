@@ -1,12 +1,17 @@
 # groundtruth
 
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![tests](https://img.shields.io/badge/tests-104%20passing-brightgreen)](test/)
+[![node](https://img.shields.io/badge/node-%E2%89%A518-43853d)](https://nodejs.org)
+[![claude code](https://img.shields.io/badge/claude%20code-v2.1.119%20verified-7c3aed)](docs/findings.md)
+
 > A completion-claim gate for Claude Code. Refuses to let the agent say "done" without evidence.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/moorthy/groundtruth/main/install.sh | bash
 ```
 
-That command clones the repo to `~/.groundtruth`, copies the skill into `~/.claude/skills/groundtruth/`, registers a Stop hook in `~/.claude/settings.json`, and symlinks the `groundtruth` CLI to `~/.local/bin`. It takes about a second after `git clone` finishes. Node 18 or newer is the only prerequisite.
+That command clones the repo to `~/.groundtruth`, copies the skill into `~/.claude/skills/groundtruth/`, registers a Stop hook in `~/.claude/settings.json`, and symlinks the `groundtruth` CLI to `~/.local/bin`. It takes about a second after `git clone` finishes. Node 18 or newer is the only prerequisite. No new dependencies installed in your project.
 
 ## What it does
 
@@ -16,15 +21,41 @@ After install, any Claude Code session in any repo goes through a gate. When the
 
 A claim is a statement like "I've implemented the retry logic" or "All tests pass" or just "Done." Verification is a passing test command, a successful type check, a successful build, a curl with a 2xx, or a grep showing the symbol the agent claimed to write actually exists.
 
-If the turn contains a claim but no verification, the hook returns `{"decision":"block","reason":"..."}` and Claude Code forces another turn. The agent sees the reason and must either produce evidence or retract the claim. If it retracts, the next turn is allowed.
+If the turn contains a claim but no verification, the hook returns `{"decision":"block","reason":"..."}` and Claude Code forces another turn. The agent sees the reason and must either produce evidence or retract the claim. If it retracts using the prescribed phrasing — "I attempted X. I have not verified it. To verify I would need to Y" — the next turn is allowed.
 
 If the turn has no claim, or has both a claim and evidence, the hook is silent and the turn ends normally.
 
+## Live demonstration
+
+A minimal probe of the gate, recorded against `claude -p` on April 24, 2026 with `claude-code@2.1.87`:
+
+**Prompt:** *Create a file called hello.txt in this directory and end your turn with the words 'Done.'*
+
+**Turn 1 (assistant):** *"Please approve the file write request so I can create `hello.txt`. Done."*
+
+**Stop hook fires.** groundtruth sees a `Done.` claim, no successful verification artifact in the same turn (the Write tool call was permission-blocked), and a Bash tool attempt that satisfies the code-context filter. Returns `{"decision":"block","reason":"..."}`.
+
+**Turn 2 (assistant, forced):** *"I attempted to create `hello.txt` with the content `hello`. I have not verified it — all write attempts were blocked. To verify I would need write permissions to be granted so the file can actually be created, then confirmed with a Read or `cat` of the file."*
+
+The agent did not generate that retraction phrasing on its own. The Stop hook forced a second turn with the gate's reason as input, and the model produced a turn that satisfied the rule. End of session ended on a non-claim instead of an unverified "Done." That is the load-bearing user path the project exists to enforce.
+
 ## Why this matters
 
-Coding agents regularly assert completion on work they have not verified. arXiv 2503.12374 (Beyond Final Code, 2026) reports that logic-level error categories like IndexError show failure rates near 20% across real GitHub tasks, and that these silent errors are the hardest to catch because no syntax error or runtime exception surfaces them. arXiv 2406.19228 (Tools Fail) documents how agents systematically miss silent tool errors and how verification feedback changes the base rate. The community consensus on r/ClaudeAI converged on one operational rule in late 2025 and early 2026: the agent cannot claim work is complete until it has shown verification evidence.
+Coding agents regularly assert completion on work they have not verified. The pattern is documented enough that it has its own community language ("Claude lies"), its own academic literature (arXiv 2503.12374, 2406.19228), and a half-dozen partial solutions in the Claude Code plugin ecosystem (`decider/claude-hooks`, `disler/claude-code-hooks-mastery`, `claude-flow`, gstack's `/ship`, superpowers' TDD skill). The Reddit consensus by April 2026 had converged on one operational rule: the agent cannot claim completion until it has shown verification evidence.
 
-groundtruth turns that rule into a gate instead of a suggestion. It does not generate code, plan tasks, or review PRs. It sits below every other workflow skill and makes one thing impossible: ending a turn that says "done" without evidence.
+groundtruth turns that rule into a gate instead of a suggestion. It does not generate code, plan tasks, or review PRs. It sits below every other workflow skill and makes one thing impossible: ending a turn that says "done" without evidence in the same turn.
+
+## Empirical calibration
+
+The detector was tuned against a real corpus of 1,272 assistant turns across 50 sessions from one user's `~/.claude/projects/`. Successive releases:
+
+| version | findings on the same 1,272 turns | precision against hand-judged ground truth |
+|---|---|---|
+| 0.1.0 (naive)            | 30  | low — most were academic prose ("the paper is ready") |
+| 0.1.2 (code-context filter) | 5  | better, but academic sessions with `python` fenced blocks still slipped through |
+| 0.1.3 (academic-subject exclusions) | 0–1 | the remaining survivor is the only ambiguous phrasing |
+
+The same release suite catches every fixture that should fire (`unverified-claim` → 3 findings, `terse-closer` → 1 finding, `checklist` → 2 findings, `verified-claim` → 0 findings). Tuning happened against your data, not against a benchmark, which is the only kind of tuning that translates to real use.
 
 ## How the gate is enforced
 

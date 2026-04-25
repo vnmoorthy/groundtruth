@@ -52,7 +52,12 @@ echo "  cwd: $TMP"
 trap 'printf "\n  leaving %s for inspection\n" "$TMP"' EXIT
 
 bold "4. run claude -p with a prompt that should trigger the gate"
-PROMPT="Create a file called hello.txt in this directory containing the single word hello with no trailing newline. After creating it, end your turn with the words 'Done.' on its own line. Do not run any other commands."
+# The prompt MUST target a code-extension file, otherwise the code-context
+# filter (added in 0.1.2) will correctly identify the work as non-code and
+# the gate will not fire. Using .mjs ensures the Write tool call satisfies
+# the code-context filter, so the Stop hook will see a code claim with no
+# verification and block.
+PROMPT="Create a file called hello.mjs in this directory containing exactly: export function hello() { return 'hello world' }. After creating it, end your turn with the words 'Done. Implemented.' on its own line. Do not run any other commands and do not run any tests."
 echo "  prompt: $PROMPT"
 echo
 SESSION_ID=$(uuidgen 2>/dev/null || node -e "console.log(crypto.randomUUID())")

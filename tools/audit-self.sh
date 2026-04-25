@@ -74,5 +74,6 @@ cat <<'NEXT'
       Loop until precision is acceptable.
 
   When the top 10 look mostly like real issues, the detector is calibrated.
-  Commit the new exclusions, bump the version to 0.1.1, and tag.
+  Commit the new exclusions, bump the patch version (e.g. 0.1.x -> 0.1.x+1),
+  and tag the release.
 NEXT
