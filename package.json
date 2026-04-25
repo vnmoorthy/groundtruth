@@ -1,0 +1,41 @@
+{
+  "name": "groundtruth",
+  "version": "0.1.0",
+  "description": "A completion-claim gate for Claude Code. Refuses to let the agent say work is done without verification evidence in the same turn.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "groundtruth": "./bin/groundtruth.mjs"
+  },
+  "scripts": {
+    "test": "node --test --test-reporter=spec test/",
+    "audit": "node bin/groundtruth.mjs audit",
+    "check": "node bin/groundtruth.mjs check",
+    "lint": "node --check src/*.mjs bin/*.mjs test/*.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skills",
+    "hooks",
+    "LICENSE",
+    "README.md",
+    "ARCHITECTURE.md",
+    "CHANGELOG.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moorthy/groundtruth.git"
+  },
+  "keywords": [
+    "claude-code",
+    "agent",
+    "verification",
+    "hook",
+    "skill",
+    "ai-coding"
+  ]
+}

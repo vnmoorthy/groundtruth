@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Show me a sample README snippet."},"timestamp":"2026-04-24T15:00:00.000Z"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Here is an example of what the README could contain:\n\n```md\n## Status\n\n- The new feature is implemented\n- All tests pass\n- The build is complete\n```\n\nThat is just a sample; I have not written the README yet."}]},"timestamp":"2026-04-24T15:00:01.000Z"}

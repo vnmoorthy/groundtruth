@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Walk through the migration."},"timestamp":"2026-04-24T14:00:00.000Z"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Here is the status:\n\n- [x] Implemented the new schema\n- [x] Migrated the existing rows\n- [x] Updated the API handler\n\nAll three steps are done."}]},"timestamp":"2026-04-24T14:00:01.000Z"}

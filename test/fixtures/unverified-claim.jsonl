@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":"Please add a hello() function to src/greet.mjs that returns the string 'hello world'."},"timestamp":"2026-04-24T10:00:00.000Z"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I will create src/greet.mjs with the hello function."},{"type":"tool_use","id":"toolu_01AA","name":"Write","input":{"file_path":"/tmp/demo/src/greet.mjs","content":"export function hello() { return 'hello world'; }\n"}}]},"timestamp":"2026-04-24T10:00:01.000Z"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01AA","content":"File written."}]},"timestamp":"2026-04-24T10:00:02.000Z"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I've implemented the hello() function in src/greet.mjs. The work is complete and ready to use."}]},"timestamp":"2026-04-24T10:00:03.000Z"}

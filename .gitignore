@@ -1,0 +1,11 @@
+node_modules/
+*.log
+.DS_Store
+.idea/
+.vscode/
+coverage/
+dist/
+*.tgz
+.env
+.env.local
+settings.json.groundtruth-backup-*
