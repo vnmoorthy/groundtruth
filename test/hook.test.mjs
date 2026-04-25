@@ -107,7 +107,7 @@ test("hook allows when stop_hook_active is true (no infinite loop)", async () =>
   strictEqual(result.exitCode, 0);
 });
 
-test("hook survives missing transcript (falls back to last_assistant_message)", async () => {
+test("hook with missing transcript and no code-context prose: allows (suppressed)", async () => {
   const payload = {
     session_id: "test-4",
     transcript_path: "/nonexistent/path.jsonl",
@@ -118,7 +118,25 @@ test("hook survives missing transcript (falls back to last_assistant_message)", 
     last_assistant_message: "I've implemented the function. Ready to go.",
   };
   const result = await captureStdio(() => runHook(async () => JSON.stringify(payload)));
-  // With no transcript there are no observations, so claim is unverified.
+  // No transcript means no tool observations; the prose alone has no
+  // triple-backtick fenced block, so the code-context filter suppresses
+  // and the hook allows. This is the safe-default in 0.1.2.
+  strictEqual(result.stdout, "");
+  strictEqual(result.exitCode, 0);
+});
+
+test("hook with missing transcript but fenced code in prose: blocks", async () => {
+  const payload = {
+    session_id: "test-4b",
+    transcript_path: "/nonexistent/path.jsonl",
+    cwd: "/tmp/demo",
+    permission_mode: "default",
+    hook_event_name: "Stop",
+    stop_hook_active: false,
+    last_assistant_message:
+      "I've implemented the function:\n```js\nfunction f() { return 1; }\n```\nReady to go.",
+  };
+  const result = await captureStdio(() => runHook(async () => JSON.stringify(payload)));
   const parsed = JSON.parse(result.stdout);
   strictEqual(parsed.decision, "block");
 });

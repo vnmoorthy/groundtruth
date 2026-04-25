@@ -4,6 +4,26 @@ All notable changes to this project are recorded here.
 Format follows [keepachangelog.com](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [semver.org](https://semver.org).
 
+## [0.1.2] — 2026-04-24
+
+The 0.1.1 code-context filter still fired on academic prose because the underlying CODE_VOCAB list contained words like `method`, `class`, `module`, `argument`, `return`, `this`, `new`, which appear constantly in non-code English. Real audit against 50 sessions reproduced the same 30 findings as 0.1.0.
+
+This release tightens the filter to only count hard signals.
+
+### Changed
+
+- `hasCodeContext` now returns true only if (a) a tool call is `Bash`/`BashOutput`, (b) `Write`/`Edit`/`MultiEdit`/`NotebookEdit` against a code-extension path, (c) `Read`/`Grep` against a code-extension path, or (d) the assistant text contains a triple-backtick fenced code block. The previous CODE_VOCAB and FILE_PATH_HINT heuristics are removed.
+- Test fixture `checklist.jsonl` updated to include a Write tool call so it represents a real code session, not freestanding prose.
+- Two tests updated to reflect the stricter behavior: `checkTurn` no longer blocks claims with no code context (now suppresses), and the hook test for missing transcripts allows when the prose has no fenced block.
+
+### Added
+
+- `explainCodeContext(text, observations)` returns the matched signal for diagnostics.
+
+### Test count
+
+95 tests pass (was 90).
+
 ## [0.1.1] — 2026-04-24
 
 Calibration release driven by a real-data audit against 50 sessions / 1,272 turns of one user's `~/.claude/projects`. The unfiltered detector produced 30 findings, all from non-code work (academic paper writing, submission tracking, citation management). This release adds a code-context filter to keep groundtruth focused on its stated scope.

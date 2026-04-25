@@ -3,10 +3,22 @@ import { test } from "node:test";
 import { strictEqual, ok } from "node:assert";
 import { checkTurn } from "../src/check.mjs";
 
-test("checkTurn blocks on claim with no verification", () => {
-  const r = checkTurn("I've implemented the hello function.", []);
+test("checkTurn blocks on claim with code context and no verification", () => {
+  // After 0.1.2: a claim alone (no code context) is suppressed. The
+  // original test from 0.1.0 passed naked text. Now we add a Write to a
+  // .mjs file as a code signal.
+  const r = checkTurn("I've implemented the hello function.", [
+    { tool: "Write", input: { file_path: "/tmp/demo/hello.mjs" }, output: "" },
+  ]);
   strictEqual(r.blocked, true);
   ok(r.reason.includes("verification"));
+  ok(r.claims.length >= 1);
+});
+
+test("checkTurn suppresses (does NOT block) a claim with no code context", () => {
+  const r = checkTurn("I've implemented the hello function.", []);
+  strictEqual(r.blocked, false);
+  strictEqual(r.suppressed, "no-code-context");
   ok(r.claims.length >= 1);
 });
 
