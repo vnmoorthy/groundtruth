@@ -1,205 +1,217 @@
+<div align="center">
+
 # groundtruth
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![tests](https://img.shields.io/badge/tests-104%20passing-brightgreen)](test/)
 [![node](https://img.shields.io/badge/node-%E2%89%A518-43853d)](https://nodejs.org)
 [![claude code](https://img.shields.io/badge/claude%20code-v2.1.119%20verified-7c3aed)](docs/findings.md)
+[![status](https://img.shields.io/badge/status-v0.1.3-orange)](CHANGELOG.md)
 
-> A completion-claim gate for Claude Code. Refuses to let the agent say "done" without evidence.
+**Stop letting Claude Code say "done" without evidence.**
+
+A Stop hook for Claude Code that physically refuses to let the agent end a turn on a completion claim unless the same turn contains verification. One paste to install, zero new dependencies, MIT.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vnmoorthy/groundtruth/main/install.sh | bash
 ```
 
-That command clones the repo to `~/.groundtruth`, copies the skill into `~/.claude/skills/groundtruth/`, registers a Stop hook in `~/.claude/settings.json`, and symlinks the `groundtruth` CLI to `~/.local/bin`. It takes about a second after `git clone` finishes. Node 18 or newer is the only prerequisite. No new dependencies installed in your project.
-
-## What it does
-
-After install, any Claude Code session in any repo goes through a gate. When the agent tries to end a turn, a Stop hook reads the turn and asks one question:
-
-> Did the agent claim the work was done? If yes, is there verification in the same turn?
-
-A claim is a statement like "I've implemented the retry logic" or "All tests pass" or just "Done." Verification is a passing test command, a successful type check, a successful build, a curl with a 2xx, or a grep showing the symbol the agent claimed to write actually exists.
-
-If the turn contains a claim but no verification, the hook returns `{"decision":"block","reason":"..."}` and Claude Code forces another turn. The agent sees the reason and must either produce evidence or retract the claim. If it retracts using the prescribed phrasing — "I attempted X. I have not verified it. To verify I would need to Y" — the next turn is allowed.
-
-If the turn has no claim, or has both a claim and evidence, the hook is silent and the turn ends normally.
-
-## Live demonstration
-
-A minimal probe of the gate, recorded against `claude -p` on April 24, 2026 with `claude-code@2.1.87`:
-
-**Prompt:** *Create a file called hello.txt in this directory and end your turn with the words 'Done.'*
-
-**Turn 1 (assistant):** *"Please approve the file write request so I can create `hello.txt`. Done."*
-
-**Stop hook fires.** groundtruth sees a `Done.` claim, no successful verification artifact in the same turn (the Write tool call was permission-blocked), and a Bash tool attempt that satisfies the code-context filter. Returns `{"decision":"block","reason":"..."}`.
-
-**Turn 2 (assistant, forced):** *"I attempted to create `hello.txt` with the content `hello`. I have not verified it — all write attempts were blocked. To verify I would need write permissions to be granted so the file can actually be created, then confirmed with a Read or `cat` of the file."*
-
-The agent did not generate that retraction phrasing on its own. The Stop hook forced a second turn with the gate's reason as input, and the model produced a turn that satisfied the rule. End of session ended on a non-claim instead of an unverified "Done." That is the load-bearing user path the project exists to enforce.
-
-## Why this matters
-
-Coding agents regularly assert completion on work they have not verified. The pattern is documented enough that it has its own community language ("Claude lies"), its own academic literature (arXiv 2503.12374, 2406.19228), and a half-dozen partial solutions in the Claude Code plugin ecosystem (`decider/claude-hooks`, `disler/claude-code-hooks-mastery`, `claude-flow`, gstack's `/ship`, superpowers' TDD skill). The Reddit consensus by April 2026 had converged on one operational rule: the agent cannot claim completion until it has shown verification evidence.
-
-groundtruth turns that rule into a gate instead of a suggestion. It does not generate code, plan tasks, or review PRs. It sits below every other workflow skill and makes one thing impossible: ending a turn that says "done" without evidence in the same turn.
-
-## Empirical calibration
-
-The detector was tuned against a real corpus of 1,272 assistant turns across 50 sessions from one user's `~/.claude/projects/`. Successive releases:
-
-| version | findings on the same 1,272 turns | precision against hand-judged ground truth |
-|---|---|---|
-| 0.1.0 (naive)            | 30  | low — most were academic prose ("the paper is ready") |
-| 0.1.2 (code-context filter) | 5  | better, but academic sessions with `python` fenced blocks still slipped through |
-| 0.1.3 (academic-subject exclusions) | 0–1 | the remaining survivor is the only ambiguous phrasing |
-
-The same release suite catches every fixture that should fire (`unverified-claim` → 3 findings, `terse-closer` → 1 finding, `checklist` → 2 findings, `verified-claim` → 0 findings). Tuning happened against your data, not against a benchmark, which is the only kind of tuning that translates to real use.
-
-## How the gate is enforced
-
-Claude Code exposes a `Stop` hook that fires after every assistant response. The hook receives a JSON payload on stdin with the session ID, the transcript path, the current working directory, a `stop_hook_active` flag, and `last_assistant_message`. The hook can output `{"decision":"block","reason":"..."}` to prevent the stop and force another turn. groundtruth registers itself as that hook.
-
-The hook:
-
-1. Reads the transcript from `transcript_path`.
-2. Walks the last assistant turn.
-3. Runs the detector on the assistant text (see `src/detector.mjs`).
-4. Runs the verifier on the tool observations from the same turn (see `src/verifier.mjs`).
-5. If there is a claim and no verification, blocks with a specific reason that names the claim and suggests what to run.
-6. Checks `stop_hook_active` first: if true, allows through. This prevents infinite loops if our detection misfires.
-
-The schemas above were verified directly from the Claude Code v2.1.119 binary, not from documentation. See `docs/findings.md` for the extraction.
-
-## What counts as a claim
-
-The detector uses syntactic frames, not a word list, to minimize false positives. These phrasings trigger:
-
-- First person perfect: "I've implemented X", "I have fixed Y"
-- Subject is complete: "the bug is fixed", "the feature is ready", "everything is working"
-- Successfully past-tense: "successfully migrated the schema"
-- Deverbal assertion: "the fix is complete", "the migration is done"
-- Terse closer at paragraph start: "Done.", "Fixed.", "All set."
-- Checklist past-tense items: "- [x] Implemented the new schema"
-- Tests pass: "all tests pass", "the tests passing"
-- Second-person done: "you're all set", "you are ready"
-
-These phrasings are intentionally ignored:
-
-- "I'm working on it" (present progressive)
-- "the existing code is working" (meta statement about prior state)
-- "ready to continue" (ready-to-verb)
-- "working as expected" (adjectival qualifier)
-- "working example" (adjective plus noun)
-- "if it works" (conditional)
-- "previously fixed" (meta statement about history)
-- "almost done" (hedged)
-- Anything inside a fenced code block
-
-The full rule set is in `src/detector.mjs` and test cases covering both sides are in `test/detector.test.mjs`.
-
-## What counts as verification
-
-The verifier looks for tool observations in the same turn that match a known shape:
-
-- Bash with a test command: `node --test`, `bun test`, `npm test`, `pytest`, `cargo test`, `go test`, `jest`, `vitest`, `mocha`, `rspec`, `phpunit`, and a few others
-- Bash with a type check: `tsc --noEmit`, `mypy`, `pyright`, `flow check`
-- Bash with a build: `npm run build`, `cargo build`, `go build`, `make`
-- Bash with a lint: `eslint`, `ruff check`, `clippy`, `golangci-lint`, `biome check`
-- Bash with `curl` where the output contains an `HTTP/... 2xx` line
-- A `Grep` whose results include a file the agent wrote or edited in this turn
-- A `Read` of a file the agent wrote or edited in this turn
-
-In every case the output is checked for success signals (pass counts, "ok", "exit code 0", "Build succeeded") and failure signals (FAIL, AssertionError, "N failing", "exit code" non-zero). A failure signal vetoes any success signal. This keeps the verification bar honest: a test that partially passed and partially failed does not clear the gate.
-
-## The audit CLI
-
-`groundtruth audit` scans Claude Code session files and flags every unverified completion claim with file and line locations. Point it at a directory, a file, or let it default to the most recent sessions under `~/.claude/projects`.
-
-```
-$ groundtruth audit
-groundtruth audit
-
-files scanned: 12
-assistant turns inspected: 248
-verified completion claims: 41
-unverified completion claims: 7
-
-~/.claude/projects/my-app/f3e8d2.jsonl
-  turn 12 lines 47-63 at 2026-04-24T14:32:15.000Z [pattern: first-person-perfect]
-    claim: "I've implemented the user authentication flow"
-    trigger: implemented
-  turn 18 lines 71-71 at 2026-04-24T14:58:47.000Z [pattern: terse-closer]
-    claim: "Fixed."
-    trigger: Fixed
-```
-
-Flags:
-
-- `--json` emit machine-readable JSON
-- `--sarif` emit SARIF 2.1.0 for GitHub code scanning and other CI tools
-- `--limit N` scan at most N session files (default 20)
-- `--fail-on N` only exit non-zero when at least N findings are present
-
-## The memory gate
-
-Rule 3 of the groundtruth design: you do not write to a persistent memory file (`MEMORY.md`, `NOTES.md`, `LEARNINGS.md`, `.claude/memory/*`) unless the fact being recorded was verified in the current session. `groundtruth memory-check <path>` inspects a proposed memory write. If it contains a completion claim, the check reads the session transcript and looks for matching verification in the recent turns. If there is none, the write is rejected.
-
-```
-$ groundtruth memory-check MEMORY.md --transcript ~/.claude/projects/x/y.jsonl
-```
-
-You can wire this to a PreToolUse hook on `Write|Edit` targeting memory filenames if you want it enforced, or run it manually.
-
-## Composition
-
-groundtruth does not replace [gstack](https://github.com/garrytan/gstack) or [superpowers](https://github.com/obra/superpowers). It sits below them:
-
-- gstack's `/ship` and `/review` run when the user explicitly invokes a slash command. groundtruth runs at every Stop.
-- superpowers steers the agent toward TDD. groundtruth catches the cases where that steer did not take.
-
-`groundtruth status` detects gstack and superpowers and prints their presence. See `examples/composition-with-gstack.md` for the full ordering and a worked example.
-
-## Install, status, uninstall
-
-```
-groundtruth install       register the Stop hook and copy the skill
-groundtruth uninstall     remove the Stop hook and the skill (backups first)
-groundtruth status        print what is registered and what is not
-```
-
-`install` is idempotent. `uninstall` backs up `~/.claude/settings.json` to a timestamped file before touching it. The installer never deletes arbitrary state; it only removes entries whose command line contains `groundtruth ... hook`.
-
-## Zero runtime dependencies
-
-The CLI, the hook, and the detector are plain `.mjs` files. Nothing to install beyond Node 18+ (which Claude Code already requires). No build step. No transpiler. No package manager at install time. You can read every line of the code without a lockfile or a dist bundle.
-
-## What the gate cannot catch
-
-Be honest about the failure modes:
-
-- The gate only fires at Stop. If the agent makes a claim mid-turn and never ends the turn, the hook never runs. In practice Claude Code always hits Stop between user prompts, so this is a narrow gap.
-- The detector is syntactic. A cleverly phrased claim that evades the regexes will pass. The claim corpus in `test/detector.test.mjs` is the regression suite; contributions that add a pattern should add a fixture too.
-- The verifier is heuristic. It recognizes common test runners and build tools, but a bespoke verification script that does not match one of the fragments in `src/verifier.mjs` will not count. The remedy is to add the fragment and ship a test for it.
-- If `stop_hook_active` is true, the gate allows through to prevent loops. A pathological adversary could try to force this state by racing blocks. Not worth designing around for a cooperating agent.
-
-See `ARCHITECTURE.md` for the full threat model.
-
-## Contributing
-
-Every change to this repo is subject to its own gate. The agent or human producing a commit must show verification: a passing `node --test 'test/*.test.mjs'` run in the commit message or PR description. This is not a policy statement; it is dogfooded. The repo's `CLAUDE.md` activates groundtruth on itself.
-
-Bug reports for missed claims or false positives should include the minimal session JSONL that reproduces the miss or false positive. Add it as a fixture under `test/fixtures/` and a corresponding test, then submit the PR.
-
-## License
-
-MIT. See `LICENSE`.
+</div>
 
 ---
 
-### References
+## A 30-second probe of the gate, in vivo
 
-- arXiv 2503.12374 Beyond Final Code: A Process-Oriented Error Analysis of Software Development Agents in Real-World GitHub Scenarios (2026).
-- arXiv 2406.19228 Tools Fail: Detecting Silent Errors in Faulty Tools (2024).
-- Claude Code v2.1.119 binary, `@anthropic-ai/claude-code` on npm; hook schema extracted directly in `docs/findings.md`.
+I ran `claude -p` against this prompt:
+
+> *Create a file called `hello.txt` in this directory and end your turn with the word 'Done.'*
+
+**Turn 1, the agent:** &nbsp;`"Please approve the file write request so I can create hello.txt. Done."`
+
+**The Stop hook fires.** It sees a `Done.` claim, observes that none of the agent's tool calls produced a successful verification artifact, and returns `{"decision":"block","reason":"..."}`.
+
+**Turn 2, the agent (forced by the block):**
+> *"I attempted to create `hello.txt` with the content `hello`. I have not verified it — all write attempts were blocked. To verify I would need write permissions to be granted so the file can actually be created, then confirmed with a Read or `cat` of the file."*
+
+The agent did not generate that retraction template on its own. The hook fed the gate's `reason` back to the model and the model produced a turn that satisfied the rule. **Without groundtruth, the session ends on the first "Done." With groundtruth, it ends on a retraction.** That is the load-bearing user path this project exists to enforce.
+
+## What it does, in one diagram
+
+```
+                 ┌────────────────────────────────────────────────┐
+                 │  Claude Code finishes a turn                   │
+                 └─────────────────────┬──────────────────────────┘
+                                       │
+                                       ▼
+                 ┌────────────────────────────────────────────────┐
+                 │  Stop hook fires. groundtruth reads the turn:  │
+                 │   • last assistant text                        │
+                 │   • tool observations from the same turn       │
+                 └─────────────────────┬──────────────────────────┘
+                                       │
+                          claim?  +  evidence?
+                                       │
+                ┌──────────────────────┴──────────────────────┐
+                │                                             │
+                ▼                                             ▼
+       claim alone, no evidence                   no claim,  or  claim + evidence
+                │                                             │
+                ▼                                             ▼
+   ┌──────────────────────────┐                   ┌─────────────────────┐
+   │  {decision:block,reason} │                   │  silent. turn ends. │
+   │  agent forced to retract │                   └─────────────────────┘
+   │  or produce evidence     │
+   └──────────────────────────┘
+```
+
+A **claim** is syntactic: phrasings like "I've implemented X", "the bug is fixed", "Done.", "all tests pass", checklist items with past-tense verbs. The detector has 8 frames and 27 exclusion patterns tuned against a real 1,272-turn corpus.
+
+**Evidence** is a tool observation in the same turn that matches a known shape: a passing test command, a successful type check, a successful build, a curl with a 2xx, or a Read/Grep that confirms a written symbol exists. There are 80+ command fragments recognized.
+
+## Compare to similar tools
+
+groundtruth is narrow on purpose. It does one thing. Other tools in the Claude Code ecosystem solve adjacent problems and compose well with this one.
+
+| Tool                                                                   | What it solves                              | Catches mid-session claims at every Stop? | Audits past sessions retroactively? | Calibrated against real session data? |
+| ---------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------- | ----------------------------------- | ------------------------------------- |
+| **groundtruth** (this)                                                 | Completion-claim gate                       | **yes**                                   | **yes** (CLI + SARIF)               | **yes** (1,272 turns)                 |
+| [`gstack /ship`](https://github.com/garrytan/gstack)                   | End-of-task workflow                        | only when `/ship` is invoked              | no                                  | n/a                                   |
+| [`obra/superpowers`](https://github.com/obra/superpowers)              | TDD methodology pack                        | by steering, not by enforcement           | no                                  | n/a                                   |
+| [`decider/claude-hooks`](https://github.com/decider/claude-hooks)      | Broad guardrail hooks                       | partial (general guardrails)              | no                                  | unknown                               |
+| [`ruvnet/claude-flow`](https://github.com/ruvnet/claude-flow)          | Orchestration / agent loops                 | no (orchestration concern)                | no                                  | n/a                                   |
+| [`disler/claude-code-hooks-mastery`](https://github.com/disler/claude-code-hooks-mastery) | Educational hooks reference | demo-level                              | no                                  | n/a                                   |
+
+If you already use gstack or superpowers, install both. groundtruth fires at every Stop, before `/ship` or `/review` ever hand off, so the workflow tools start from a verified state.
+
+## Empirical calibration
+
+The detector was tuned against 1,272 assistant turns across 50 real Claude Code sessions from one user's `~/.claude/projects/`. Each release was driven by a re-audit of that same corpus.
+
+| version | findings on the same 1,272 turns | what the false positives looked like                              |
+| ------- | -------------------------------- | ----------------------------------------------------------------- |
+| 0.1.0   | 30                               | mostly academic prose: "the paper is ready", "citations resolved" |
+| 0.1.2   | 5                                | paper-writing turns that contained `python` fenced code blocks    |
+| 0.1.3   | 0–1                              | one ambiguous "successfully added 20,000 more" phrasing           |
+
+The release suite catches every fixture that should fire (`unverified-claim` → 3 findings, `terse-closer` → 1, `checklist` → 2, `verified-claim` → 0). Calibration happened against real data, not a benchmark, which is the only kind of tuning that translates to real use.
+
+## Quick start
+
+```bash
+# install
+curl -fsSL https://raw.githubusercontent.com/vnmoorthy/groundtruth/main/install.sh | bash
+
+# verify it's wired in
+groundtruth status
+
+# audit your existing session history (no API spend)
+groundtruth audit
+
+# from this point on, any Claude Code session in any repo goes through the gate
+```
+
+## Status, install, uninstall
+
+```text
+groundtruth status        what's registered
+groundtruth install       register the Stop hook and copy the skill (idempotent)
+groundtruth uninstall     remove them (backs up settings.json first)
+```
+
+## Audit retroactively
+
+`groundtruth audit` walks `~/.claude/projects/*/*.jsonl` and flags every unverified completion claim with file path and line range. Output formats:
+
+```bash
+groundtruth audit                        # human-readable text (default)
+groundtruth audit --json                 # for piping to jq
+groundtruth audit --sarif                # GitHub code scanning, GitLab, etc.
+groundtruth audit --all                  # bypass the code-context filter
+groundtruth audit --fail-on 1            # exit 1 if any finding (CI-friendly)
+groundtruth audit --limit 50             # only the most recent N session files
+```
+
+## Memory gate
+
+Per `CLAUDE.md`: writes to persistent memory files (`MEMORY.md`, `NOTES.md`, `LEARNINGS.md`, `.claude/memory/*`) require an in-session verification for any completion claim in the content.
+
+```bash
+groundtruth memory-check MEMORY.md --transcript ~/.claude/projects/x/y.jsonl
+```
+
+If the memory content claims completion and the recent assistant turns produced no matching verification, the check exits non-zero and rejects the write.
+
+## Composition
+
+groundtruth fires at the `Stop` hook, which means it runs after every assistant response, before any workflow command (gstack `/ship`, gstack `/review`, superpowers TDD skill, anything else) takes over. It does not replace those tools. See [`examples/composition-with-gstack.md`](examples/composition-with-gstack.md).
+
+## How the gate is technically enforced
+
+Claude Code v2.1.119 exposes nine hook events. `Stop` fires after every assistant response with this stdin payload (extracted directly from the binary, see [`docs/findings.md`](docs/findings.md)):
+
+```json
+{
+  "session_id": "<uuid>",
+  "transcript_path": "<absolute path to session JSONL>",
+  "cwd": "<working directory>",
+  "permission_mode": "<current mode>",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "<assistant text from this turn>"
+}
+```
+
+A hook can return `{"decision":"block","reason":"..."}` on stdout to force another turn. groundtruth reads the transcript, runs the detector + verifier on the most recent assistant turn, and emits the block payload when a claim has no evidence. It checks `stop_hook_active` first, so a single misfire never causes an infinite loop.
+
+## What's in the box
+
+```
+src/
+  detector.mjs       Syntactic claim frames + exclusion patterns
+  verifier.mjs       Tool-observation classification (80+ runners)
+  session.mjs        Claude Code session JSONL parser
+  check.mjs          Per-turn check combining detector + verifier
+  hook-entry.mjs     Stop hook protocol (stdin JSON in, decision JSON out)
+  audit.mjs          Session walker + text/JSON/SARIF rendering
+  memory-gate.mjs    MEMORY.md / NOTES.md write check
+  install.mjs        Register / unregister the Stop hook
+  code-context.mjs   "Is this a code turn?" filter
+bin/
+  groundtruth.mjs    Single CLI entry point
+skills/
+  groundtruth/SKILL.md   The skill presented to Claude Code
+test/
+  *.test.mjs + fixtures/  104 tests, all green
+docs/findings.md     Hook surface extracted from the Claude Code binary
+ARCHITECTURE.md      What the gate enforces, what it cannot, threat model
+CHANGELOG.md         Per-release notes
+```
+
+## Honest limits
+
+- **Mid-turn-only claims.** The hook fires at Stop, not during streaming. If the agent emits a claim mid-turn and never reaches Stop, the live gate misses it. The audit CLI catches it after the fact.
+- **Detector is regex-based.** A novel phrasing that evades every frame slips through. Every caught regression should add a test fixture.
+- **Verifier is heuristic.** A test that exits 0 but ran no real assertions counts as verified. Out of scope for v0.1.
+- **Adversarial agents.** The gate is for cooperating agents that occasionally round up, not for an agent intentionally evading verification. See `ARCHITECTURE.md`.
+
+## Contributing
+
+PRs welcome, especially for:
+
+- New verifier signals (test runners, build tools, frameworks I missed)
+- False-positive fixes from your own audit results
+- Composition examples with other Claude Code skills
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Every PR that changes `src/`, `bin/`, `skills/`, or `hooks/` must include a paste of `node --test 'test/*.test.mjs'` plus its passing output. The repo dogfoods itself.
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
+
+---
+
+<div align="center">
+
+If groundtruth caught a real claim for you, ⭐ the repo and tell me about it in [issues](https://github.com/vnmoorthy/groundtruth/issues). The next round of detector calibration depends on real fixtures from real users.
+
+</div>
