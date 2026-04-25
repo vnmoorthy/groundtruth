@@ -4,6 +4,41 @@ All notable changes to this project are recorded here.
 Format follows [keepachangelog.com](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [semver.org](https://semver.org).
 
+## [0.1.3] — 2026-04-24
+
+The 0.1.2 code-context filter dropped findings from 30 to 5 against the same real corpus, but the remaining 5 were all paper-writing claims slipping through because the academic-flavored sessions contained code-language fenced blocks (Python data analysis, SQL examples) that satisfied the code-context filter while the actual claim was about manuscript work.
+
+This release adds detector-level academic-subject exclusions so those phrasings never become claims in the first place, regardless of whether the surrounding turn has code context.
+
+### Added
+
+- `EXCLUSION_PATTERNS` in `src/detector.mjs` now includes:
+  - Memory-observer XML tags (`<completed>`, `<fact>`, `<next_steps>`, `<achievement>`, etc.) emitted by agent observability tools.
+  - Paper / manuscript / submission / chapter / section / abstract / bibliography / figure subjects in is/are completion frames, with up to ~6 words of modifiers between the noun and the verb.
+  - Paper-writing compound subjects: `Paper editing`, `paper preparation`, `paper writing`, etc.
+  - Pure-academic-flavor work modifiers: `intellectual and technical work`, `scholarly work`, etc. (`technical` alone is too code-adjacent to exclude.)
+  - Citation / bibliography / footnote / endnote work.
+  - Word-count operations: `Added 54 words`, `Cut 200 words`.
+  - Author metadata operations.
+  - Paper venues anywhere in the sentence: TMLR, NeurIPS, ICML, ICLR, CVPR, arXiv, OpenReview, etc., including underscore-joined forms like `PAVO_TMLR_submission`.
+  - Compiled / typeset PDF / LaTeX / TeX output.
+- 9 new detector tests, each derived from a real false positive surfaced in audit-self.
+
+### Changed
+
+- Two pre-existing tests updated to match the new behavior: paper-writing fixtures are now suppressed at the detector layer, not the code-context layer.
+
+### Test count
+
+104 tests pass (was 95).
+
+### Empirical result
+
+On a corpus of 50 sessions / 1,272 turns from one academic user's `~/.claude/projects`:
+- v0.1.0: 30 findings (all false positives)
+- v0.1.2: 5 findings (all false positives, code-context filter limited)
+- v0.1.3: expected close to 0 - 1 finding (the remaining is a numeric "successfully added N items" phrasing that is too generic to safely exclude)
+
 ## [0.1.2] — 2026-04-24
 
 The 0.1.1 code-context filter still fired on academic prose because the underlying CODE_VOCAB list contained words like `method`, `class`, `module`, `argument`, `return`, `this`, `new`, which appear constantly in non-code English. Real audit against 50 sessions reproduced the same 30 findings as 0.1.0.

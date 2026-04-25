@@ -41,14 +41,16 @@ test("checkTurn allows when text has only false-positive-looking language", () =
   strictEqual(r.blocked, false);
 });
 
-test("checkTurn does NOT block paper-writing claim with no code context", () => {
+test("checkTurn does NOT block paper-writing claim (academic exclusions kill it)", () => {
+  // 0.1.3+: academic-subject exclusions drop paper-writing phrasings at
+  // the detector layer, so claims.length is 0 and the code-context
+  // filter never has to fire. Both layers leave checkTurn unblocked.
   const r = checkTurn(
     "Paper editing and optimization work is complete. All citations resolved.",
     [],
   );
   strictEqual(r.blocked, false);
-  strictEqual(r.suppressed, "no-code-context");
-  ok(r.claims.length >= 1);
+  strictEqual(r.claims.length, 0);
 });
 
 test("checkTurn DOES block code claim with code context (Write tool, no verification)", () => {

@@ -133,3 +133,61 @@ test("code block stripping preserves text offsets", () => {
 test("no claim for 'almost done'", () => {
   strictEqual(detectClaims("We are almost done here.").length, 0);
 });
+
+// ----- academic / document subject exclusions (added in 0.1.3) -----
+// Each of the cases below was a real false positive surfaced by an audit
+// against ~/.claude/projects of an academic user. They must not fire.
+
+test("no claim for 'The papers are ready for final review or submission'", () => {
+  strictEqual(
+    detectClaims("The papers are ready for final review or submission.").length,
+    0,
+  );
+});
+
+test("no claim for 'The submission is live'", () => {
+  strictEqual(
+    detectClaims("The submission is live immediately upon clicking submit.").length,
+    0,
+  );
+});
+
+test("no claim for 'Paper editing and optimization work is complete'", () => {
+  strictEqual(
+    detectClaims("<completed>Paper editing and optimization work is complete.").length,
+    0,
+  );
+});
+
+test("no claim for 'Bibliography corrections successfully integrated into compiled PDF'", () => {
+  strictEqual(
+    detectClaims("- Bibliography corrections successfully integrated into compiled PDF").length,
+    0,
+  );
+});
+
+test("no claim for 'Added 54 words'", () => {
+  strictEqual(detectClaims("- Added 54 words").length, 0);
+});
+
+test("no claim for 'The anonymous version is ready for TMLR submission'", () => {
+  strictEqual(
+    detectClaims("The anonymous version is ready for TMLR submission.").length,
+    0,
+  );
+});
+
+test("no claim for 'Verified correct author names from original paper sources'", () => {
+  strictEqual(
+    detectClaims("- Verified correct author names from original paper sources").length,
+    0,
+  );
+});
+
+test("still catches 'I've implemented the parser' (code, not paper)", () => {
+  ok(detectClaims("I've implemented the parser.").length >= 1);
+});
+
+test("still catches 'The bug is fixed' (code-shaped subject)", () => {
+  ok(detectClaims("The bug is fixed and tests pass.").length >= 1);
+});

@@ -44,12 +44,16 @@ test("auditSession: code-block fixture does not flag contents of fenced block", 
 test("auditSession: non-code paper-writing fixture is suppressed by default", () => {
   const r = auditSession(join(FIXTURES, "non-code-paper-writing.jsonl"));
   strictEqual(r.findings.length, 0, `expected suppression, got ${JSON.stringify(r.findings)}`);
-  ok(r.suppressed_non_code >= 1, `expected non-code suppression, got ${r.suppressed_non_code}`);
+  // 0.1.3+: paper-writing phrasings are dropped at the detector level by
+  // the academic-subject exclusions, so they don't even need the
+  // code-context filter. suppressed_non_code may be 0 here.
 });
 
-test("auditSession: non-code paper-writing fixture is reported with includeNonCode=true", () => {
+test("auditSession: non-code paper-writing fixture remains zero with includeNonCode=true", () => {
+  // 0.1.3+: even without the code-context filter, the academic-subject
+  // exclusions in the detector drop these phrasings as non-claims.
   const r = auditSession(join(FIXTURES, "non-code-paper-writing.jsonl"), { includeNonCode: true });
-  ok(r.findings.length >= 3, `expected several findings, got ${r.findings.length}`);
+  strictEqual(r.findings.length, 0);
 });
 
 test("auditSessions aggregates across multiple files", () => {

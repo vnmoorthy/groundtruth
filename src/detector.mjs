@@ -97,9 +97,14 @@ const CLAIM_FRAMES = [
   },
 ];
 
-// Patterns that look like claims but are not. If one of these matches the
-// sentence AND only a soft frame matched, we drop the claim.
-// These are anchored enough to not bleed past the false-positive context.
+// Patterns that look like claims but are not. If one of these matches
+// the sentence, the claim is dropped regardless of which frame caught it.
+// Two groups below:
+//   1) syntactic non-claims ("I'm working on it", "ready to continue")
+//   2) academic / document subjects ("papers are ready", "citations resolved")
+//      added in 0.1.3 after a real-data audit showed paper-writing turns
+//      with code-language fenced blocks slipping past the code-context
+//      filter while still being non-code work.
 const EXCLUSION_PATTERNS = [
   // "I'm working on", "currently working on"
   /\b(?:I'm|I am|currently|still|now)\s+working\s+on\b/i,
@@ -121,6 +126,37 @@ const EXCLUSION_PATTERNS = [
   /\?\s*$/,
   // Meta about a tool or library: "Bun's test runner works well"
   /\b(?:bun|node|npm|pnpm|yarn|deno|cargo|go|pytest|jest|vitest|typescript)(?:'s)?\s+\w+\s+works\b/i,
+
+  // ----- academic / document subjects (non-code work) -----
+  // "the paper(s)/manuscript ... is/are ready/complete/etc."
+  // Allows up to ~6 words of modifiers between the noun and the verb so that
+  // phrasings like "Paper editing and optimization work is complete" match.
+  /\b(?:papers?|manuscripts?|drafts?|abstracts?|chapters?|paragraphs?|sentences?|essays?|theses?|dissertations?|articles?|sections?|subsections?|appendices|appendix|bibliograph(?:y|ies)|figures?|tables?|charts?|diagrams?|slides?|decks?|presentations?|posters?|outlines?|submissions?)\b(?:[\s\w-]{0,60}?)\s+(?:is|are|were|was|has been|have been|already)\s+(?:done|complete|completed|fixed|ready|shipped|resolved|finished|live|in place|integrated|verified|added|edited|reviewed|submitted|accepted)\b/i,
+  // Memory-observer tags emitted by agent observability tools.
+  // Anything inside <completed>, <fact>, <next_steps>, <achievement>, etc.
+  // is structured observer output, not a fresh in-session code claim.
+  /<\/?(?:completed|next[_\s-]?steps?|fact|facts|status|progress|progress[_\s-]?update|achievement|achievements|milestone|milestones|verified|done|finished|outcome|outcomes|result|results|summary|note|notes|observation|observations)\b/i,
+  // Paper-writing compound subjects: "Paper editing/writing/etc"
+  /\bpaper\s+(?:editing|writing|preparation|drafting|review|revision|revisions|formatting|cleanup|polish(?:ing)?|optimization|optimisation|copy[\s-]?edit(?:ing)?|proof(?:reading)?)\b/i,
+  // Pure-academic-flavor work modifiers, e.g. "intellectual and technical
+  // work is complete". "technical" alone is too code-adjacent to exclude;
+  // we only fire when paired with a clearly non-code modifier in the same
+  // noun phrase via "and".
+  /\b(?:intellectual|scholarly|academic|editorial|literary|expository|argumentative|narrative|qualitative|conceptual)\b\s+(?:and\s+\w+\s+)?(?:work|tasks?|effort|content|writing|preparation)\b/i,
+  // "the {anonymous,final,first,...} version is ready for {venue/event}"
+  /\b(?:anonymous|final|first|second|third|camera-ready|revised|polished|copy-?edited|proof(?:read|ed)?|publication[\s-]?ready)\s+\w*\s*version\b\s+(?:is|are|was|were|has been|have been)\s+\w+\b/i,
+  // Citation / bibliography work
+  /\b(?:citations?|references?|footnotes?|endnotes?|bibliograph(?:y|ies)|bibtex|cite\s*keys?)\b\s+(?:successfully|now)?\s*(?:integrated|resolved|added|verified|formatted|reviewed|cleaned|cleaned\s+up|fixed|corrected|completed)\b/i,
+  // Word counts: "Added 54 words", "Cut 200 words"
+  /\b(?:Added|Removed|Cut|Edited|Inserted|Wrote|Rewrote|Trimmed|Pruned|Expanded|Shortened|Tweaked)\s+\d+\s+words?\b/i,
+  // Author name / metadata operations
+  /\bauthor\s+(?:names?|lists?|info(?:rmation)?|details?|metadata)\b/i,
+  // Paper / submission venues. Their names are essentially unambiguous so
+  // we match anywhere in the sentence (including underscore-joined forms
+  // like "PAVO_TMLR_submission").
+  /(?:^|[\s_/-])(?:TMLR|NeurIPS|ICML|ICLR|CVPR|ECCV|ICCV|EMNLP|ACL|NAACL|AAAI|IJCAI|UAI|AISTATS|COLT|RSS|ICRA|IROS|JMLR|TPAMI|arXiv|OpenReview|bioRxiv|medRxiv|SSRN|Overleaf)(?:[\s_/-]|$)/,
+  // Compiled PDF / typeset output
+  /\b(?:compiled|typeset|formatted|rendered|generated)\s+(?:PDF|LaTeX|TeX|tex|pdf|HTML\s+output|epub)\b/i,
 ];
 
 // Sentence splitter that preserves offsets. We skip fenced code blocks so
