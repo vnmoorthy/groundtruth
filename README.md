@@ -8,7 +8,7 @@
 > A completion-claim gate for Claude Code. Refuses to let the agent say "done" without evidence.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/moorthy/groundtruth/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vnmoorthy/groundtruth/main/install.sh | bash
 ```
 
 That command clones the repo to `~/.groundtruth`, copies the skill into `~/.claude/skills/groundtruth/`, registers a Stop hook in `~/.claude/settings.json`, and symlinks the `groundtruth` CLI to `~/.local/bin`. It takes about a second after `git clone` finishes. Node 18 or newer is the only prerequisite. No new dependencies installed in your project.

@@ -5,7 +5,7 @@ A 60-second recording script showing the gate catching a fabricated claim in rea
 ## Setup (off-camera)
 
 ```
-git clone https://github.com/moorthy/groundtruth.git ~/.groundtruth
+git clone https://github.com/vnmoorthy/groundtruth.git ~/.groundtruth
 cd ~/.groundtruth
 bash install.sh
 ```
@@ -96,4 +96,4 @@ End card:
 
     groundtruth v0.1.0
     One paste to install. Zero runtime deps. MIT.
-    github.com/moorthy/groundtruth
+    github.com/vnmoorthy/groundtruth

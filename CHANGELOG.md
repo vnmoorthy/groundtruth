@@ -122,4 +122,4 @@ The first release. Everything in this version was verified end-to-end before tag
 - Verifier recognizes common test runners but not bespoke verification scripts. Add a fragment to `TEST_COMMAND_FRAGMENTS` or equivalent and add a test.
 - Memory gate is a command, not yet a PreToolUse hook by default. Wiring it into the installer is a two-line change; left opt-in to keep the default footprint small.
 
-[0.1.0]: https://github.com/moorthy/groundtruth/releases/tag/v0.1.0
+[0.1.0]: https://github.com/vnmoorthy/groundtruth/releases/tag/v0.1.0

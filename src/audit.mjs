@@ -259,7 +259,7 @@ export function renderReportSarif(report) {
         tool: {
           driver: {
             name: "groundtruth",
-            informationUri: "https://github.com/moorthy/groundtruth",
+            informationUri: "https://github.com/vnmoorthy/groundtruth",
             rules: [
               {
                 id: "unverified-completion-claim",

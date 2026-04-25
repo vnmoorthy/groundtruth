@@ -3,7 +3,7 @@
 #
 # The canonical one-liner is:
 #
-#   curl -fsSL https://raw.githubusercontent.com/moorthy/groundtruth/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/vnmoorthy/groundtruth/main/install.sh | bash
 #
 # What this does:
 #   1. Clones (or updates) the repo into ~/.groundtruth
@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-REPO_URL="${GROUNDTRUTH_REPO:-https://github.com/moorthy/groundtruth.git}"
+REPO_URL="${GROUNDTRUTH_REPO:-https://github.com/vnmoorthy/groundtruth.git}"
 INSTALL_DIR="${GROUNDTRUTH_INSTALL_DIR:-$HOME/.groundtruth}"
 BIN_TARGET="${GROUNDTRUTH_BIN_TARGET:-$HOME/.local/bin}"
 BRANCH="${GROUNDTRUTH_BRANCH:-main}"
