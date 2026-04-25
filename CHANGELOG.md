@@ -4,6 +4,33 @@ All notable changes to this project are recorded here.
 Format follows [keepachangelog.com](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [semver.org](https://semver.org).
 
+## [0.1.1] — 2026-04-24
+
+Calibration release driven by a real-data audit against 50 sessions / 1,272 turns of one user's `~/.claude/projects`. The unfiltered detector produced 30 findings, all from non-code work (academic paper writing, submission tracking, citation management). This release adds a code-context filter to keep groundtruth focused on its stated scope.
+
+### Added
+
+- `src/code-context.mjs` — code-context filter. A turn is treated as code work only if (a) it contains a tool call to `Write`/`Edit`/`MultiEdit`/`NotebookEdit`/`Bash`/`BashOutput`, (b) `Read` or `Grep` against a code-extension path, (c) a fenced code block in the assistant text, (d) a code-shaped file path mention, (e) shell-command vocabulary, or (f) common programming keywords.
+- `--all` flag (alias `--include-non-code`) on `audit` and `check` to bypass the filter when tuning.
+- `suppressed_non_code` counter in audit reports so suppressed findings remain countable.
+- Tests for the code-context filter (12 cases) and the audit suppression behavior.
+
+### Changed
+
+- `checkTurn` and `auditSession` now apply the code-context filter by default. A claim found in a non-code turn is suppressed instead of blocking. Per CLAUDE.md the rule was always scoped to code work; this release enforces that scope at the gate.
+- `auditSession` and `auditSessions` accept `{ includeNonCode: true }` opts.
+
+### Fixed
+
+- `tools/bootstrap.sh` no longer exits silently on a missing global git identity; it sets a repo-local identity from `whoami` + hostname and tells you to override.
+- `tools/bootstrap.sh` now matches both Node 22 (`# tests 74`) and Node 24 summary formats.
+- `tools/live-smoke.sh` no longer falsely fails the "Stop hook registered" check due to a `pipefail` + SIGPIPE interaction with `grep -q`.
+- `tools/audit-self.sh` and `tools/live-smoke.sh` fall back to the repo-local CLI when `groundtruth` is not on PATH.
+
+### Test count
+
+90 tests pass (was 74).
+
 ## [0.1.0] — 2026-04-24
 
 The first release. Everything in this version was verified end-to-end before tagging. Every file in the repo was produced under the repo's own gate; see `CLAUDE.md`.

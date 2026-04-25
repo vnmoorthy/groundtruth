@@ -63,12 +63,20 @@ examples:
 `;
 
 function parseFlags(args) {
-  const flags = { json: false, sarif: false, limit: 20, failOn: 1, color: null };
+  const flags = {
+    json: false,
+    sarif: false,
+    limit: 20,
+    failOn: 1,
+    color: null,
+    includeNonCode: false,
+  };
   const positional = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--json") flags.json = true;
     else if (a === "--sarif") flags.sarif = true;
+    else if (a === "--all" || a === "--include-non-code") flags.includeNonCode = true;
     else if (a === "--limit") {
       const n = parseInt(args[++i], 10);
       if (!Number.isNaN(n) && n > 0) flags.limit = n;
@@ -103,7 +111,7 @@ async function main() {
     case "audit": {
       const { flags, positional } = parseFlags(rest);
       const files = discoverFromArgs(positional).slice(0, flags.limit);
-      const report = auditSessions(files);
+      const report = auditSessions(files, { includeNonCode: flags.includeNonCode });
       if (flags.sarif) {
         process.stdout.write(renderReportSarif(report) + "\n");
       } else if (flags.json) {
@@ -115,13 +123,13 @@ async function main() {
       break;
     }
     case "check": {
-      const { positional } = parseFlags(rest);
+      const { flags, positional } = parseFlags(rest);
       if (positional.length === 0) {
         process.stderr.write("groundtruth check: a file path is required\n");
         process.exit(2);
       }
       const files = discoverFromArgs(positional);
-      const report = auditSessions(files);
+      const report = auditSessions(files, { includeNonCode: flags.includeNonCode });
       process.stdout.write(renderReport(report, { footer: false }) + "\n");
       process.exit(report.findings.length > 0 ? 1 : 0);
       break;

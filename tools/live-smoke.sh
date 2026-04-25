@@ -31,14 +31,17 @@ echo "  $(command -v claude)"
 claude --version 2>&1 | head -1
 
 bold "2. confirm Stop hook is registered"
-if ! "${GT[@]}" status 2>/dev/null | grep -q "stop hook:"; then
-  echo "  groundtruth status did not produce output. Run bash install.sh first."
+# Capture the status output once, then inspect it. Using a pipeline with
+# `grep -q` causes false negatives on macOS bash because pipefail + the
+# early-exit close on grep -q can make the upstream exit non-zero via SIGPIPE.
+STATUS_OUT=$("${GT[@]}" status 2>&1 || true)
+if [ -z "$STATUS_OUT" ]; then
+  echo "  groundtruth status produced no output. Try: ${GT[*]} status"
   exit 1
 fi
-"${GT[@]}" status
-
-if ! "${GT[@]}" status 2>/dev/null | grep -q "stop hook:        registered"; then
-  echo
+echo "$STATUS_OUT"
+echo
+if ! printf '%s\n' "$STATUS_OUT" | grep -q "stop hook:[[:space:]]*registered"; then
   echo "  Stop hook is NOT registered. Run: bash install.sh"
   exit 1
 fi

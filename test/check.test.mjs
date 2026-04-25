@@ -28,3 +28,28 @@ test("checkTurn allows when text has only false-positive-looking language", () =
   const r = checkTurn("I'm ready to continue. The existing code is working as expected.", []);
   strictEqual(r.blocked, false);
 });
+
+test("checkTurn does NOT block paper-writing claim with no code context", () => {
+  const r = checkTurn(
+    "Paper editing and optimization work is complete. All citations resolved.",
+    [],
+  );
+  strictEqual(r.blocked, false);
+  strictEqual(r.suppressed, "no-code-context");
+  ok(r.claims.length >= 1);
+});
+
+test("checkTurn DOES block code claim with code context (Write tool, no verification)", () => {
+  const r = checkTurn("I've implemented the parser.", [
+    { tool: "Write", input: { file_path: "/tmp/parser.mjs" }, output: "" },
+  ]);
+  strictEqual(r.blocked, true);
+});
+
+test("checkTurn DOES block code claim with fenced code in text (no verification)", () => {
+  const r = checkTurn(
+    "I've implemented the function:\n```js\nfunction f() { return 1; }\n```\nDone.",
+    [],
+  );
+  strictEqual(r.blocked, true);
+});

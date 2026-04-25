@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { parseSessionFile, observationsForTurn } from "./session.mjs";
 import { detectClaims } from "./detector.mjs";
 import { detectVerifications } from "./verifier.mjs";
+import { hasCodeContext } from "./code-context.mjs";
 
 /** @typedef {{
  *   file: string,
@@ -25,6 +26,7 @@ import { detectVerifications } from "./verifier.mjs";
 /** @typedef {{
  *   findings: Finding[],
  *   verified: number,
+ *   suppressed_non_code: number,
  *   total_turns: number,
  *   files_scanned: number
  * }} AuditReport
@@ -86,12 +88,22 @@ export function defaultSessionFiles(limit = 20) {
 
 /**
  * Audit a single session file.
+ *
+ * Default behavior applies the code-context filter: a turn whose claim
+ * is not in a code-shaped context is suppressed, on the grounds that
+ * groundtruth's scope per CLAUDE.md is code work, not general task
+ * completion. Pass { includeNonCode: true } to bypass the filter and
+ * see every claim regardless of context (useful for tuning).
+ *
+ * @param {string} filePath
+ * @param {{ includeNonCode?: boolean }} [opts]
  */
-export function auditSession(filePath) {
+export function auditSession(filePath, opts = {}) {
   const turns = parseSessionFile(filePath);
   /** @type {Finding[]} */
   const findings = [];
   let verifiedCount = 0;
+  let suppressedCount = 0;
   for (const turn of turns) {
     if (turn.kind !== "assistant") continue;
     const claims = detectClaims(turn.text);
@@ -100,6 +112,10 @@ export function auditSession(filePath) {
     const verifs = detectVerifications(obs);
     if (verifs.length > 0) {
       verifiedCount += 1;
+      continue;
+    }
+    if (!opts.includeNonCode && !hasCodeContext(turn.text, obs)) {
+      suppressedCount += 1;
       continue;
     }
     for (const claim of claims) {
@@ -115,20 +131,34 @@ export function auditSession(filePath) {
       });
     }
   }
-  return { findings, verified: verifiedCount, total_turns: turns.length };
+  return {
+    findings,
+    verified: verifiedCount,
+    suppressed_non_code: suppressedCount,
+    total_turns: turns.length,
+  };
 }
 
 /**
  * Audit multiple files.
+ * @param {string[]} files
+ * @param {{ includeNonCode?: boolean }} [opts]
  */
-export function auditSessions(files) {
+export function auditSessions(files, opts = {}) {
   /** @type {AuditReport} */
-  const report = { findings: [], verified: 0, total_turns: 0, files_scanned: 0 };
+  const report = {
+    findings: [],
+    verified: 0,
+    suppressed_non_code: 0,
+    total_turns: 0,
+    files_scanned: 0,
+  };
   for (const f of files) {
     try {
-      const r = auditSession(f);
+      const r = auditSession(f, opts);
       report.findings.push(...r.findings);
       report.verified += r.verified;
+      report.suppressed_non_code += r.suppressed_non_code || 0;
       report.total_turns += r.total_turns;
       report.files_scanned += 1;
     } catch (err) {
@@ -157,6 +187,11 @@ export function renderReport(report, opts = {}) {
         : c("green", "0")
     }`,
   );
+  if (report.suppressed_non_code > 0) {
+    lines.push(
+      `${c("dim", "suppressed (non-code context):")} ${c("dim", String(report.suppressed_non_code))} ${c("dim", "(rerun with --all to see)")}`,
+    );
+  }
   lines.push("");
   if (report.findings.length === 0) {
     lines.push(c("green", "No unverified completion claims found."));

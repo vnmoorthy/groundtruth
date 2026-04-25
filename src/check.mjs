@@ -5,13 +5,21 @@
 //   - If yes, is there a matching verification artifact in the same turn?
 //   - If the claim has no verification, return a block payload with a
 //     reason the hook can feed back to Claude.
+//
+// We also apply a code-context filter: groundtruth's scope per CLAUDE.md
+// is code work, not arbitrary task completion. A turn that says "the
+// paper is ready" with no code-related signals should not be blocked.
+// A turn that says "the parser is fixed" alongside an Edit on parser.mjs
+// is exactly what we want to gate. The filter is in src/code-context.mjs.
 
 import { detectClaims } from "./detector.mjs";
 import { detectVerifications } from "./verifier.mjs";
+import { hasCodeContext } from "./code-context.mjs";
 
 /** @typedef {{
  *   blocked: boolean,
  *   reason?: string,
+ *   suppressed?: string,
  *   claims: import("./detector.mjs").Claim[],
  *   verifications: import("./verifier.mjs").Verification[]
  * }} CheckResult
@@ -47,6 +55,18 @@ export function checkTurn(text, observations) {
   }
   if (verifs.length > 0) {
     return { blocked: false, claims, verifications: verifs };
+  }
+  // Scope filter: only gate code-work claims. A claim made in a turn with
+  // no code signals (no code-extension file paths, no fenced code blocks,
+  // no code-shape vocabulary, no Bash/Write/Edit tool calls) is out of
+  // scope for groundtruth.
+  if (!hasCodeContext(text || "", observations || [])) {
+    return {
+      blocked: false,
+      claims,
+      verifications: verifs,
+      suppressed: "no-code-context",
+    };
   }
   const suggestion = suggestFromClaims(claims);
   return {

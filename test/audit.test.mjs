@@ -41,6 +41,17 @@ test("auditSession: code-block fixture does not flag contents of fenced block", 
   strictEqual(r.findings.length, 0);
 });
 
+test("auditSession: non-code paper-writing fixture is suppressed by default", () => {
+  const r = auditSession(join(FIXTURES, "non-code-paper-writing.jsonl"));
+  strictEqual(r.findings.length, 0, `expected suppression, got ${JSON.stringify(r.findings)}`);
+  ok(r.suppressed_non_code >= 1, `expected non-code suppression, got ${r.suppressed_non_code}`);
+});
+
+test("auditSession: non-code paper-writing fixture is reported with includeNonCode=true", () => {
+  const r = auditSession(join(FIXTURES, "non-code-paper-writing.jsonl"), { includeNonCode: true });
+  ok(r.findings.length >= 3, `expected several findings, got ${r.findings.length}`);
+});
+
 test("auditSessions aggregates across multiple files", () => {
   const files = [
     join(FIXTURES, "unverified-claim.jsonl"),

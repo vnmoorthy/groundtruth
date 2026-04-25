@@ -74,7 +74,8 @@ if [ -d .git ]; then
 
   git add -A
 
-  TEST_OUTPUT=$(node --test 'test/*.test.mjs' 2>&1 | grep -E "^# (tests|suites|pass|fail|duration)" || true)
+  # Match both node 22 ("# tests 74") and node 24 ("tests 74") summary formats.
+  TEST_OUTPUT=$(node --test 'test/*.test.mjs' 2>&1 | grep -E "^#?\s*(tests|suites|pass|fail|duration)\s+[0-9]" || true)
 
   COMMIT_MSG=$(cat <<MSG
 v0.1.0 initial release
@@ -110,12 +111,21 @@ fi
 
 # --- step 2: rerun the test suite outside the sandbox ---
 bold "step 2: rerun the test suite"
-if node --test 'test/*.test.mjs' 2>&1 | grep -E "^# (tests|pass|fail|duration)"; then
-  ok "tests reported"
+TEST_LOG=$(mktemp)
+node --test 'test/*.test.mjs' > "$TEST_LOG" 2>&1
+TEST_EXIT=$?
+SUMMARY=$(grep -E "^#?\s*(tests|suites|pass|fail|duration)\s+[0-9]" "$TEST_LOG" || true)
+if [ -n "$SUMMARY" ]; then
+  echo "$SUMMARY" | sed 's/^/   /'
+fi
+if [ "$TEST_EXIT" -eq 0 ]; then
+  ok "test runner exited 0"
 else
-  warn "tests did not report a summary line"
+  warn "test runner exited $TEST_EXIT (see $TEST_LOG for details)"
+  tail -20 "$TEST_LOG" | sed 's/^/      /'
   ANY_STEP_FAILED=1
 fi
+rm -f "$TEST_LOG"
 
 # --- step 3: install ---
 bold "step 3: install groundtruth into your ~/.claude/"
