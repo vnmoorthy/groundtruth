@@ -75,14 +75,14 @@ if [ -d .git ]; then
   git add -A
 
   # Match both node 22 ("# tests 74") and node 24 ("tests 74") summary formats.
-  TEST_OUTPUT=$(node --test 'test/*.test.mjs' 2>&1 | grep -E "^#?\s*(tests|suites|pass|fail|duration)\s+[0-9]" || true)
+  TEST_OUTPUT=$(node --test 2>&1 | grep -E "^#?\s*(tests|suites|pass|fail|duration)\s+[0-9]" || true)
 
   COMMIT_MSG=$(cat <<MSG
 v0.1.0 initial release
 
 Verification (per CLAUDE.md):
 
-  \$ node --test 'test/*.test.mjs'
+  \$ node --test
 $(echo "$TEST_OUTPUT" | sed 's/^/  /')
 
 What is here:
@@ -112,7 +112,7 @@ fi
 # --- step 2: rerun the test suite outside the sandbox ---
 bold "step 2: rerun the test suite"
 TEST_LOG=$(mktemp)
-node --test 'test/*.test.mjs' > "$TEST_LOG" 2>&1
+node --test > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
 SUMMARY=$(grep -E "^#?\s*(tests|suites|pass|fail|duration)\s+[0-9]" "$TEST_LOG" || true)
 if [ -n "$SUMMARY" ]; then

@@ -202,7 +202,7 @@ PRs welcome, especially for:
 - False-positive fixes from your own audit results
 - Composition examples with other Claude Code skills
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). Every PR that changes `src/`, `bin/`, `skills/`, or `hooks/` must include a paste of `node --test 'test/*.test.mjs'` plus its passing output. The repo dogfoods itself.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Every PR that changes `src/`, `bin/`, `skills/`, or `hooks/` must include a paste of `node --test` plus its passing output. The repo dogfoods itself.
 
 ## License
 

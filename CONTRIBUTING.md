@@ -6,7 +6,7 @@ Thanks for considering a contribution. This project has a single rule: every com
 
 A PR description (or commit message) that says the work is complete must paste verification evidence in the same description. The canonical evidence for this repo is:
 
-    $ node --test 'test/*.test.mjs'
+    $ node --test
     # tests <N>
     # pass <N>
     # fail 0
@@ -34,7 +34,7 @@ If you use a build/test/lint tool that `src/verifier.mjs` does not recognize, ad
 1. Add the command fragment to the appropriate list (`TEST_COMMAND_FRAGMENTS`, `BUILD_COMMAND_FRAGMENTS`, etc.).
 2. Add success/failure signal regexes if your tool's output uses an unusual format.
 3. Add a test in `test/verifier.test.mjs` against a real sample of the tool's output.
-4. Run `node --test 'test/*.test.mjs'`.
+4. Run `node --test`.
 
 ## Detector philosophy
 

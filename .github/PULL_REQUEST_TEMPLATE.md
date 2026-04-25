@@ -2,7 +2,7 @@
 Per CLAUDE.md: any PR that changes src/, bin/, skills/, or hooks/ must paste
 verification evidence here. The canonical command for this repo is:
 
-    node --test 'test/*.test.mjs'
+    node --test
 
 A passing run looks like:
 
@@ -18,7 +18,7 @@ A passing run looks like:
 ## Verification
 
 ```
-$ node --test 'test/*.test.mjs'
+$ node --test
 # tests <fill in>
 # pass  <fill in>
 # fail  0

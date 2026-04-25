@@ -21,7 +21,12 @@ jobs:
       - name: syntax check
         run: node --check src/*.mjs bin/*.mjs test/*.mjs
       - name: test
-        run: node --test 'test/*.test.mjs'
+        # `node --test` with no path arg walks the cwd and auto-discovers
+        # *.test.{js,mjs,cjs} files. This is the only form portable across
+        # Node 18, 20, and 22. The quoted-glob form (`'test/*.test.mjs'`)
+        # is Node 22+ only; the directory form (`test/`) treats it as a
+        # single file path.
+        run: node --test
       - name: install flow (local mode)
         run: |
           export HOME=$(mktemp -d)

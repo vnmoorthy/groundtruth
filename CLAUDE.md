@@ -6,7 +6,7 @@ This file activates groundtruth on the groundtruth repo itself. Every commit to 
 
 You may not end a turn by asserting that a piece of code work is done, complete, fixed, ready, shipped, implemented, built, resolved, wired up, hooked up, landed, merged, working, or passing, unless the same turn also contains at least one of:
 
-- A test command and its passing output (`node --test 'test/*.test.mjs'` is the canonical one for this repo)
+- A test command and its passing output (`node --test` is the canonical one for this repo)
 - A successful type check
 - A successful build
 - A successful lint
@@ -17,7 +17,7 @@ If you cannot produce evidence, say instead: "I attempted X. I have not verified
 
 ## The test command for this repo
 
-    cd /path/to/groundtruth && node --test 'test/*.test.mjs'
+    cd /path/to/groundtruth && node --test
 
 A passing run looks like:
 

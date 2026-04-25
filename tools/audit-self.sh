@@ -70,7 +70,7 @@ cat <<'NEXT'
     - false positive (phrasing was not actually a completion claim) → add the
       sentence to test/fixtures/false-positives.jsonl, add a regex exclusion
       to src/detector.mjs EXCLUSION_PATTERNS, then rerun the tests:
-          node --test 'test/*.test.mjs'
+          node --test
       Loop until precision is acceptable.
 
   When the top 10 look mostly like real issues, the detector is calibrated.
