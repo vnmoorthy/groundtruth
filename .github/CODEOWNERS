@@ -1,0 +1,24 @@
+# CODEOWNERS — added per /cso security review (v0.1.10).
+#
+# Required review on the paths with the largest blast radius:
+#  - .github/   (CI workflows; can run arbitrary code in CI with GITHUB_TOKEN)
+#  - install.sh (curl-pipe-bash entry point; reaches every user on next install)
+#  - src/hook-entry.mjs and src/install.mjs (runs on user machines as their UID)
+#  - src/memory-hook-entry.mjs (PreToolUse hook with permission decisions)
+#  - skills/    (loaded by Claude Code as agent instructions)
+#  - SECURITY.md (the threat model itself)
+#
+# Default ownership covers everything else.
+# After adding this file, enable "Require review from Code Owners" on the
+# main branch in the GitHub repo settings (Settings → Branches → Branch
+# protection rules → main).
+
+* @vnmoorthy
+
+/.github/                @vnmoorthy
+/install.sh              @vnmoorthy
+/src/hook-entry.mjs      @vnmoorthy
+/src/install.mjs         @vnmoorthy
+/src/memory-hook-entry.mjs @vnmoorthy
+/skills/                 @vnmoorthy
+/SECURITY.md             @vnmoorthy

@@ -7,7 +7,7 @@
 [![audit](https://img.shields.io/badge/audit-1k%20turns%20%2F%2027ms-3fb950)](test/perf.test.mjs)
 [![node](https://img.shields.io/badge/node-%E2%89%A518-43853d)](https://nodejs.org)
 [![claude code](https://img.shields.io/badge/claude%20code-v2.1.119%20verified-7c3aed)](docs/findings.md)
-[![status](https://img.shields.io/badge/status-v0.1.9-orange)](CHANGELOG.md)
+[![status](https://img.shields.io/badge/status-v0.1.10-orange)](CHANGELOG.md)
 [![playground](https://img.shields.io/badge/try%20it-no%20install-7c3aed)](https://vnmoorthy.github.io/groundtruth/playground.html)
 
 **Stop letting Claude Code say "done" without evidence.**

@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Keep pinned GitHub Actions SHAs up to date. Per /cso review (v0.1.10):
+  # SHA-pinning prevents floating-tag attacks; Dependabot keeps the SHAs
+  # current as upstream actions release new versions.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
+    labels:
+      - dependencies
+      - github-actions

@@ -59,10 +59,16 @@ If you don't trust running scripts via `curl | bash`, the alternative is `git cl
 
 This is the realistic ongoing risk. The install line points at `main`, which is mutable. If maintainer credentials are compromised or a malicious PR is merged, the install line would deliver the bad code on the next `bash install.sh` run.
 
-Mitigations:
+Mitigations now in place (added in v0.1.10 per `/cso` security review):
 
-- Pin the install to a tagged release: `git clone --depth 1 --branch v0.1.x https://github.com/vnmoorthy/groundtruth.git ~/.groundtruth`. Tags are immutable in the standard git workflow.
-- The repo has no merged-without-review path. Branch protection on `main` is recommended (set in GitHub repo settings).
+- **CODEOWNERS** at `.github/CODEOWNERS` requires explicit review from `@vnmoorthy` on the highest-blast-radius paths: `/.github/` (CI workflows), `/install.sh` (entry point), `/src/hook-entry.mjs`, `/src/install.mjs`, `/src/memory-hook-entry.mjs`, `/skills/`, and `SECURITY.md` itself.
+- **GitHub Actions SHA-pinning** in `.github/workflows/ci.yml` removes the floating-tag attack on `actions/checkout` and `actions/setup-node`. SHAs are immutable; tags are not.
+- **Dependabot** at `.github/dependabot.yml` keeps the pinned SHAs current as upstream actions release new versions, so we get security updates without manual intervention.
+
+Things you should still do as the user:
+
+- Pin the install to a tagged release for production: `git clone --depth 1 --branch v0.1.x https://github.com/vnmoorthy/groundtruth.git ~/.groundtruth`. Tags are immutable in the standard git workflow.
+- Enable "Require review from Code Owners" on the `main` branch in GitHub repo settings (Settings → Branches → Branch protection rules → main). The CODEOWNERS file is in place; the toggle to enforce it is a UI-only change.
 - Watching the repo on GitHub will email you when new commits land.
 
 **Threat 4: the Stop hook misbehaves and breaks your sessions.**

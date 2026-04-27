@@ -4,6 +4,28 @@ All notable changes to this project are recorded here.
 Format follows [keepachangelog.com](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [semver.org](https://semver.org).
 
+## [0.1.10] — 2026-04-27
+
+Acts on both findings from gstack `/cso` security audit. Both were MEDIUM, both are now closed.
+
+### Added
+
+- **`.github/CODEOWNERS`** — requires review from `@vnmoorthy` on the highest-blast-radius paths: `.github/`, `install.sh`, the hook entry points, the install module, the memory hook, the skills directory, and `SECURITY.md` itself. Closes the largest gap: a malicious commit on `main` cascading to every user via the `curl | bash` install line. The companion change is enabling "Require review from Code Owners" on the `main` branch (GitHub repo settings → Branches), which is a UI toggle the user has to flip; the file landing here is the prerequisite.
+- **`.github/dependabot.yml`** — schedules weekly updates for the `github-actions` ecosystem so the SHA pins stay current as upstream actions release.
+
+### Changed
+
+- **`.github/workflows/ci.yml`** — pinned `actions/checkout@v4` and `actions/setup-node@v4` to specific SHAs (`b4ffde65f46336ab88eb53be808477a3936bae11` and `1e60f620b9541d16bece96c5465dc8ee9832be0b`). Floating tags are mutable; SHAs are not. Inline comments reference the security review.
+- **`SECURITY.md`** — Threat 3 (malicious commit on main) updated to reflect that both mitigations are in place. The file now distinguishes between mitigations the project ships and configuration the user must enable.
+
+### gstack `/cso` audit summary
+
+The `/cso` audit ran a stack-detection, attack-surface, secrets, and DOM-sink pass. It dropped 5 candidate findings as already-mitigated or non-exploitable (zero deps, no eval, no spawn of user input, no outbound HTTP, escaped innerHTML in the playground, the user-supplied regex ReDoS being self-inflicted) and surfaced 2 real ones, both addressed in this release. The full report is at `.gstack/security-reports/2026-04-27T101245.json` (gitignored, local only).
+
+### Test count
+
+135 tests pass (unchanged — these were CI/security additions, no source changes).
+
 ## [0.1.9] — 2026-04-25
 
 Multi-angle review pass: ran the equivalent of CEO / engineering / devex / security / design critiques on the project and shipped the highest-leverage fixes.
