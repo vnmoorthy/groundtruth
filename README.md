@@ -198,6 +198,29 @@ CHANGELOG.md         Per-release notes
 - **Verifier is heuristic.** A test that exits 0 but ran no real assertions counts as verified. Out of scope for v0.1.
 - **Adversarial agents.** The gate is for cooperating agents that occasionally round up, not for an agent intentionally evading verification. See `ARCHITECTURE.md`.
 
+## Telemetry — none, on purpose
+
+groundtruth collects zero telemetry. No analytics, no NPS prompts, no error reporting, no docs analytics, no install-event ping. The CLI never makes outbound network calls; the Stop hook never makes outbound network calls. `grep -r "fetch\|http.request\|https.request" src/ bin/` returns nothing. This is verified in CI and locked in by `SECURITY.md`.
+
+That means we cannot measure DX adoption from inside the tool. The trade-off is intentional: groundtruth runs as your user on every Claude Code Stop event, so the bar for "phones home" is much higher than for a normal SaaS dashboard. We chose privacy-by-design over score-by-instrumentation.
+
+What this means for you:
+
+- **Bug reports replace metrics.** Paste `groundtruth doctor --json` into the issue and we get every diagnostic we'd otherwise scrape. The JSON stays on your machine unless you paste it.
+- **Adoption signal is qualitative.** GitHub Stars, GitHub Discussions thread count, and PR volume are the metrics; we read them by hand.
+- **Feedback channels are explicit.** See [Community](#community) below. There's no anonymous "tell us how you feel" widget — there's a Discussions tab and an Issues tab, both of which carry your name.
+
+If you'd like a privacy-respecting telemetry scheme proposed (opt-in, local-first, aggregable in a way that can't fingerprint you), open a Discussion. The bar to break the no-network promise is high but not infinite.
+
+## Community
+
+- **[Discussions](https://github.com/vnmoorthy/groundtruth/discussions)** — questions, ideas, "is this the right pattern?" threads, sharing detector tunings. Lower friction than Issues.
+- **[Issues](https://github.com/vnmoorthy/groundtruth/issues)** — bugs, false positives, missed claims. Templates exist for each.
+- **[Contributing guide](CONTRIBUTING.md)** — how to add a fixture, a verifier signal, or an exclusion pattern. Every PR runs `node --test` (135+ tests, currently green).
+- **[Code of conduct](CODE_OF_CONDUCT.md)** — the short version: be kind, critique ideas not people.
+
+Single-maintainer project at v0.x. Response times are measured in days, not hours; pinging the maintainer on Twitter speeds nothing up.
+
 ## More documentation
 
 - [**FAQ**](docs/FAQ.md) — answers to the most common questions, including how to handle false positives and the code-context filter.

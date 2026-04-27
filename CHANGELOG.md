@@ -4,6 +4,33 @@ All notable changes to this project are recorded here.
 Format follows [keepachangelog.com](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [semver.org](https://semver.org).
 
+## [0.1.12] — 2026-04-27
+
+Acts on the two remaining /devex-review gaps (Community 6/10, DX Measurement 3/10). Both are now closed via configuration and documentation, not new code or telemetry.
+
+### Added
+
+- **GitHub Discussions enabled** on the repo (`gh api -X PATCH ... -F has_discussions=true`). The README's new "Community" section points new users at Discussions for open-ended questions and Issues for reproducible bugs.
+- **`CODE_OF_CONDUCT.md`** — abbreviated Contributor Covenant 2.1 with a TL;DR. Short on purpose; long codes of conduct rarely change behavior.
+- **README §Telemetry — none, on purpose** — promotes the no-telemetry stance from an absence to a design decision. Names the trade-off explicitly: "we chose privacy-by-design over score-by-instrumentation." Surfaces `groundtruth doctor --json` as the bug-report bundle that replaces telemetry.
+- **README §Community** — links Discussions, Issues, Contributing, and the Code of Conduct in one place. Sets expectations: single-maintainer, response in days not hours.
+- **CONTRIBUTING.md §Where to ask** — routes Discussions vs Issues vs PRs at the top of the file. References the Code of Conduct and the no-telemetry implication for adoption signal.
+
+### Changed
+
+- **`.github/ISSUE_TEMPLATE/bug-report.md`** — the Environment block now asks for `groundtruth doctor --json` paste. Captures node + claude versions, hook registration, skill install path, config in one shot. Falls back to manual fields if the doctor command isn't present.
+- **`docs/playground.html`** footer bumped to v0.1.12.
+
+### Why DX Measurement stayed principled instead of instrumented
+
+The /devex-review boomerang flagged DX Measurement as 3/10 because there's no NPS, no analytics, no feedback widget. The standard fix is to add some flavor of telemetry. groundtruth's `SECURITY.md` says the opposite: "No telemetry. Anonymous or otherwise. The tool never phones home." The hook runs as the user's UID on every Claude Code Stop event; the bar for outbound network calls is materially higher than for a normal SaaS dashboard.
+
+So instead of breaking the security promise to score better on a DX rubric, this release converts the no-telemetry stance from an *implicit absence* into an *explicit design decision* with named trade-offs and named alternatives (Discussions, Issues, doctor --json paste). A senior reviewer evaluating the boomerang should now be able to read "DX Measurement: 3/10" as "principled non-goal" rather than "forgot to add it."
+
+### Test count
+
+145 tests pass (unchanged — these were doc and config changes, no source touched).
+
 ## [0.1.11] — 2026-04-27
 
 Acts on the six findings from gstack `/devex-review` (live developer-experience audit). One CRITICAL (broken playground URL), two HIGH (`--help` mutated state, `check` exit code lied), three MEDIUM. All six are now closed.

@@ -2,6 +2,16 @@
 
 Thanks for considering a contribution. This project has a single rule: every commit must be produced under the gate the project enforces.
 
+## Where to ask
+
+- **Open-ended questions, ideas, "is this the right pattern?"** → [GitHub Discussions](https://github.com/vnmoorthy/groundtruth/discussions). No template, no triage burden, low pressure.
+- **Reproducible bug, false positive, missed claim** → [GitHub Issues](https://github.com/vnmoorthy/groundtruth/issues) with the matching template. The bug-report template asks for `groundtruth doctor --json` so we don't have to ping you for environment details.
+- **PRs** → small, focused, with `node --test` output pasted in the description. See below.
+
+groundtruth ships no telemetry, so we cannot infer adoption or pain points from the inside. Discussion threads, issue volume, and PR cadence are the only signal we have. If something is rough, say so out loud.
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## The rule, applied to this repo
 
 A PR description (or commit message) that says the work is complete must paste verification evidence in the same description. The canonical evidence for this repo is:
