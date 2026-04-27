@@ -354,7 +354,11 @@ export function discoverFromArgs(args) {
   for (const a of args) {
     const p = resolve(a);
     if (!existsSync(p)) {
-      process.stderr.write(`groundtruth: path not found: ${p}\n`);
+      process.stderr.write(
+        `groundtruth: path not found: ${p}\n` +
+          "  Why: the path does not resolve on this filesystem (typo or moved file?).\n" +
+          "  Fix: pass an absolute path, or run from the directory that contains it.\n",
+      );
       continue;
     }
     const st = statSync(p);

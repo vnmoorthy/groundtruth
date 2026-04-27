@@ -57,7 +57,10 @@ function compileRegex(source, flags = "i") {
     return new RegExp(source, flags);
   } catch (err) {
     process.stderr.write(
-      `groundtruth config: skipping invalid regex /${source}/: ${err.message}\n`,
+      `groundtruth config: skipping invalid regex /${source}/: ${err.message}\n` +
+        "  Why: the JSON value did not parse as a JavaScript RegExp source.\n" +
+        "  Fix: edit the entry in your .groundtruthrc.json to valid RegExp syntax,\n" +
+        "       or remove it. Other entries continue to apply.\n",
     );
     return null;
   }
@@ -94,7 +97,11 @@ export function loadConfig() {
   try {
     raw = readFileSync(path, "utf8");
   } catch (err) {
-    process.stderr.write(`groundtruth config: cannot read ${path}: ${err.message}\n`);
+    process.stderr.write(
+      `groundtruth config: cannot read ${path}: ${err.message}\n` +
+        "  Why: usually a permissions problem or a deleted file.\n" +
+        `  Fix: \`chmod 644 ${path}\` or remove it to fall back to defaults.\n`,
+    );
     return { ...EMPTY };
   }
   let parsed;
@@ -102,7 +109,10 @@ export function loadConfig() {
     parsed = JSON.parse(raw);
   } catch (err) {
     process.stderr.write(
-      `groundtruth config: ${path} is not valid JSON: ${err.message}\n`,
+      `groundtruth config: ${path} is not valid JSON: ${err.message}\n` +
+        "  Why: a syntax error somewhere in the file (trailing comma, unquoted key, etc.).\n" +
+        `  Fix: \`python3 -m json.tool < ${path}\` will print the line number,\n` +
+        `       or run \`groundtruth init --force\` to regenerate from the template.\n`,
     );
     return { ...EMPTY };
   }

@@ -43,7 +43,13 @@ export async function runMemoryHook(readStdinFn = readStdin) {
   try {
     payload = JSON.parse(await readStdinFn());
   } catch (err) {
-    process.stderr.write(`groundtruth memory-hook: bad stdin (${err.message})\n`);
+    process.stderr.write(
+      `groundtruth memory-hook: bad stdin (${err.message})\n` +
+        "  Why: stdin did not contain a valid PreToolUse JSON payload.\n" +
+        "  Fix: this hook is invoked by Claude Code, not run by hand. If you\n" +
+        "       see this in a real Claude Code session, file an issue with the\n" +
+        "       payload Claude Code sent so we can adapt to schema changes.\n",
+    );
     process.exit(1);
   }
 

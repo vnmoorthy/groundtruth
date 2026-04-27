@@ -1,6 +1,6 @@
 {
   "name": "groundtruth",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "A completion-claim gate for Claude Code. Refuses to let the agent say work is done without verification evidence in the same turn.",
   "license": "MIT",
   "type": "module",

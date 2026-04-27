@@ -4,6 +4,35 @@ All notable changes to this project are recorded here.
 Format follows [keepachangelog.com](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [semver.org](https://semver.org).
 
+## [0.1.13] — 2026-04-27
+
+Polishes user-facing error messages to a consistent three-tier shape (problem / Why / Fix). Closes the last addressable /devex-review gap that doesn't violate `SECURITY.md` or invent features.
+
+### Changed
+
+Eight error paths now emit problem + cause + fix instead of one terse line:
+
+- **`groundtruth fixture add "<short>"`** — explains the 4-char minimum and shows a working example.
+- **`groundtruth audit <bad-path>`** — names the cause (path doesn't resolve) and tells you to use absolute paths or run from the right cwd.
+- **`groundtruth: unknown flag: --foo`** — points at `--help` for both global and subcommand-specific flag lists.
+- **`groundtruth check` (no args)** — explains why `check` requires a path (CI gate semantics) and shows the canonical example, plus when to use `audit` instead.
+- **`groundtruth fixture` (no subcommand)** — names the namespace, shows the only valid subcommand, references its own `--help`.
+- **`groundtruth replay <bad>`** — suggests running `audit` first to confirm the file is a session JSONL.
+- **`groundtruth memory-hook` (bad stdin)** — explains this hook is invoked by Claude Code and what to do if you see the error in a real session.
+- **`.groundtruthrc.json` parse / regex errors** — invalid JSON points you at `python3 -m json.tool` for the line number; invalid regex tells you the entry was skipped and other entries still apply.
+
+### Added
+
+- **`test/cli.test.mjs`** — 8 new tests assert each polished error path includes both a `Why:` line and a `Fix:` line. Locks the shape in against future drive-by edits that would regress to single-line errors.
+
+### Why this shipped instead of telemetry
+
+The /devex-review boomerang flagged Error Messages at 8/10 with a path to 10. The path was real polish work (consistent shape, no scope creep, no SECURITY.md violation). Other 8/10 dimensions (API/CLI/SDK, Documentation, Upgrade Path, Dev Environment) needed either feature additions, larger ecosystem, or longer track record — none of which a commit can produce. So error messages was the only "fix all of them" item with a real fix available. Boomerang prediction: Error Messages 8/10 → 10/10; everything else unchanged.
+
+### Test count
+
+153 tests pass (was 145; +8 for the new error-shape assertions).
+
 ## [0.1.12] — 2026-04-27
 
 Acts on the two remaining /devex-review gaps (Community 6/10, DX Measurement 3/10). Both are now closed via configuration and documentation, not new code or telemetry.

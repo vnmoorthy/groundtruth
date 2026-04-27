@@ -117,7 +117,12 @@ function parseFlags(args) {
     } else if (a === "-h" || a === "--help") {
       positional.push("help");
     } else if (a.startsWith("--")) {
-      process.stderr.write(`groundtruth: unknown flag: ${a}\n`);
+      process.stderr.write(
+        `groundtruth: unknown flag: ${a}\n` +
+          "  Why: not recognized by the current subcommand's flag parser.\n" +
+          "  Fix: run `groundtruth --help` for the global flag list, or\n" +
+          "       `groundtruth <subcommand> --help` for subcommand-specific flags.\n",
+      );
       process.exit(2);
     } else {
       positional.push(a);
@@ -152,7 +157,13 @@ async function main() {
     case "check": {
       const { flags, positional } = parseFlags(rest);
       if (positional.length === 0) {
-        process.stderr.write("groundtruth check: a file path is required\n");
+        process.stderr.write(
+          "groundtruth check: a file path is required.\n" +
+            "  Why: `check` is the CI gate variant; it inspects exactly the file(s) you name.\n" +
+            "  Fix: pass a session JSONL, e.g.\n" +
+            "       groundtruth check ~/.claude/projects/<hash>/<session>.jsonl\n" +
+            "       Use `groundtruth audit` (no path) for the recent-sessions sweep.\n",
+        );
         process.exit(2);
       }
       // For check (a CI gate), missing or empty input is a misuse, not a pass.
@@ -215,7 +226,12 @@ async function main() {
       if (sub === "add") {
         await runFixtureAdd(rest.slice(1));
       } else {
-        process.stderr.write("groundtruth fixture: subcommand required (add)\n");
+        process.stderr.write(
+          `groundtruth fixture: subcommand required.\n` +
+            `  Why: \`fixture\` is a namespace; \`add\` is the only subcommand currently.\n` +
+            "  Fix: run `groundtruth fixture add \"<sentence that fired or was missed>\"`\n" +
+            "       or `groundtruth fixture add --help` for the full flag list.\n",
+        );
         process.exit(2);
       }
       break;

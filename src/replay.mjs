@@ -137,7 +137,12 @@ export async function runReplay(args) {
   try {
     events = replaySession(filePath);
   } catch (err) {
-    process.stderr.write(`groundtruth replay: ${err.message}\n`);
+    process.stderr.write(
+      `groundtruth replay: ${err.message}\n` +
+        "  Why: the file could not be parsed as a Claude Code session JSONL.\n" +
+        "  Fix: confirm the path with `groundtruth audit <path>` first; if audit\n" +
+        "       parses 0 turns, the file is the wrong format.\n",
+    );
     process.exit(1);
   }
   if (flags.json) {

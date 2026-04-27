@@ -210,3 +210,79 @@ test("CLI: --help lists all diagnostic subcommands", () => {
     ok(r.stdout.includes(sub), `--help must mention '${sub}' subcommand`);
   }
 });
+
+// --- v0.1.13: error messages follow three-tier shape (problem / Why / Fix) ---
+//
+// Lock in the polish pass. Every user-facing error path should answer:
+//   what happened, why, and what the user should do next. Tests assert the
+//   "Why:" and "Fix:" prefix tokens are present so future drive-by edits don't
+//   regress to single-line errors.
+
+function assertThreeTier(stderr, label) {
+  ok(stderr.includes("Why:"), `${label}: stderr must include "Why:" line`);
+  ok(stderr.includes("Fix:"), `${label}: stderr must include "Fix:" line`);
+}
+
+test("CLI: unknown flag stderr has Why/Fix tiers", () => {
+  const r = run(["audit", "--bogus-flag-xyz"]);
+  strictEqual(r.status, 2);
+  assertThreeTier(r.stderr, "unknown flag");
+});
+
+test("CLI: check with no args stderr has Why/Fix tiers", () => {
+  const r = run(["check"]);
+  strictEqual(r.status, 2);
+  assertThreeTier(r.stderr, "check no args");
+});
+
+test("CLI: fixture with no subcommand stderr has Why/Fix tiers", () => {
+  const r = run(["fixture"]);
+  strictEqual(r.status, 2);
+  assertThreeTier(r.stderr, "fixture no subcommand");
+});
+
+test("CLI: fixture add too-short sentence stderr has Why/Fix tiers", () => {
+  const r = run(["fixture", "add", "hi"]);
+  strictEqual(r.status, 2);
+  assertThreeTier(r.stderr, "fixture add too-short");
+  ok(r.stderr.includes("4 chars"), "must name the minimum length cause");
+});
+
+test("CLI: audit with missing path stderr has Why/Fix tiers (non-fatal warn)", () => {
+  // audit skips missing paths; we still want the warn to be three-tier.
+  const r = run(["audit", "/tmp/groundtruth-no-such-path-xyz.jsonl"]);
+  // status is whatever audit decides over the empty file set; we only care about stderr
+  assertThreeTier(r.stderr, "audit missing path");
+});
+
+test("CLI: replay on missing file stderr has Why/Fix tiers", () => {
+  const r = run(["replay", "/tmp/groundtruth-replay-missing-xyz.jsonl"]);
+  strictEqual(r.status, 1);
+  assertThreeTier(r.stderr, "replay missing file");
+});
+
+test("CLI: config with invalid JSON warns with Why/Fix tiers", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "gt-cfg-"));
+  const cfg = join(tmp, ".groundtruthrc.json");
+  writeFileSync(cfg, "this is not json\n");
+  try {
+    const r = run(["audit", "test/fixtures"], undefined, { GROUNDTRUTH_CONFIG: cfg });
+    // audit still succeeds (config loader is tolerant); we only assert on the warn shape.
+    assertThreeTier(r.stderr, "config invalid JSON");
+    ok(r.stderr.includes("python3 -m json.tool") || r.stderr.includes("init --force"));
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("CLI: config with invalid regex warns with Why/Fix tiers", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "gt-cfg-"));
+  const cfg = join(tmp, ".groundtruthrc.json");
+  writeFileSync(cfg, '{"exclude_patterns":["[unclosed"]}\n');
+  try {
+    const r = run(["audit", "test/fixtures"], undefined, { GROUNDTRUTH_CONFIG: cfg });
+    assertThreeTier(r.stderr, "config invalid regex");
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});

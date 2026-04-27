@@ -108,7 +108,12 @@ export async function runFixtureAdd(args) {
   }
   const sentence = positional.join(" ").trim();
   if (sentence.length < 4) {
-    process.stderr.write("groundtruth fixture add: sentence too short.\n");
+    process.stderr.write(
+      `groundtruth fixture add: sentence too short (${sentence.length} chars).\n` +
+        "  Why: the detector needs at least 4 chars to extract a claim pattern.\n" +
+        "  Fix: paste the full sentence as it appeared in the agent's output, e.g.\n" +
+        '       groundtruth fixture add "The team is ready for the demo."\n',
+    );
     process.exit(2);
   }
 
