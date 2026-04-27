@@ -146,3 +146,44 @@ test("hook survives garbage stdin", async () => {
   strictEqual(result.exitCode, 1);
   ok(result.stderr.includes("groundtruth"));
 });
+
+// --- v0.1.11: surface schema drift instead of silently no-op'ing
+//     (per /devex-review finding #5)
+
+test("hook warns and allows when payload has neither last_assistant_message nor transcript_path", async () => {
+  const payload = {
+    session_id: "test-schema-drift",
+    cwd: "/tmp/demo",
+    permission_mode: "default",
+    hook_event_name: "Stop",
+    stop_hook_active: false,
+    // Note: no last_assistant_message, no transcript_path. Simulates a future
+    // Claude Code release that renames or restructures the payload fields.
+  };
+  const result = await captureStdio(() => runHook(async () => JSON.stringify(payload)));
+  strictEqual(result.stdout, "", "must allow (no block JSON on stdout)");
+  strictEqual(result.exitCode, 0, "fail-safe: empty payload allows the turn");
+  ok(
+    result.stderr.includes("schema may have changed"),
+    "must write a stderr warning so users notice the degradation",
+  );
+});
+
+test("hook does NOT warn when only transcript_path is present (last_assistant_message can be empty)", async () => {
+  const payload = {
+    session_id: "test-transcript-only",
+    transcript_path: "/nonexistent/path.jsonl",
+    cwd: "/tmp/demo",
+    permission_mode: "default",
+    hook_event_name: "Stop",
+    stop_hook_active: false,
+    // last_assistant_message intentionally omitted; transcript_path alone
+    // is enough for the hook to attempt parsing.
+  };
+  const result = await captureStdio(() => runHook(async () => JSON.stringify(payload)));
+  ok(
+    !result.stderr.includes("schema may have changed"),
+    "transcript_path alone is a complete payload; should not warn",
+  );
+  strictEqual(result.exitCode, 0);
+});
