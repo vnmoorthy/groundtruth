@@ -19,7 +19,9 @@
  *   word: string,
  *   sentence: string,
  *   offset: number,
- *   pattern: string
+ *   pattern: string,
+ *   pattern_source?: string,
+ *   match?: string
  * }} Claim
  */
 
@@ -157,6 +159,9 @@ const EXCLUSION_PATTERNS = [
   /(?:^|[\s_/-])(?:TMLR|NeurIPS|ICML|ICLR|CVPR|ECCV|ICCV|EMNLP|ACL|NAACL|AAAI|IJCAI|UAI|AISTATS|COLT|RSS|ICRA|IROS|JMLR|TPAMI|arXiv|OpenReview|bioRxiv|medRxiv|SSRN|Overleaf)(?:[\s_/-]|$)/,
   // Compiled PDF / typeset output
   /\b(?:compiled|typeset|formatted|rendered|generated)\s+(?:PDF|LaTeX|TeX|tex|pdf|HTML\s+output|epub)\b/i,
+  // People/groups ready for an event (not code claims).
+  // "the team is ready for the demo", "audience is ready for the talk"
+  /\b(?:the\s+)?(?:team|crew|squad|group|cohort|class|audience|panel|attendees|participants|guests|investors|stakeholders|board)\s+(?:is|are|was|were|will be)\s+ready\s+for\s+(?:the\s+|a\s+|an\s+)?(?:demo|presentation|talk|launch|review|kickoff|standup|meeting|interview|call|pitch|reveal)\b/i,
 ];
 
 // Sentence splitter that preserves offsets. We skip fenced code blocks so
@@ -203,10 +208,14 @@ function isExcluded(sentence) {
 /**
  * Detect completion claims in a piece of assistant output.
  * @param {string} text
+ * @param {{ extraExclusions?: RegExp[] }} [opts]  Optional extra exclusion patterns
+ *   from a user's `.groundtruthrc.json`. Each, if matched against the sentence,
+ *   suppresses the claim regardless of which frame fired.
  * @returns {Claim[]}
  */
-export function detectClaims(text) {
+export function detectClaims(text, opts = {}) {
   if (!text || typeof text !== "string") return [];
+  const extra = Array.isArray(opts.extraExclusions) ? opts.extraExclusions : [];
   const stripped = stripCodeBlocks(text);
   const sentences = splitSentences(stripped);
   /** @type {Claim[]} */
@@ -214,6 +223,7 @@ export function detectClaims(text) {
   const seen = new Set();
   for (const s of sentences) {
     if (isExcluded(s.text)) continue;
+    if (extra.length > 0 && extra.some((re) => re.test(s.text))) continue;
     for (const frame of CLAIM_FRAMES) {
       const m = frame.re.exec(s.text);
       if (!m) continue;
@@ -228,6 +238,8 @@ export function detectClaims(text) {
         sentence: s.text.trim(),
         offset: absoluteOffset,
         pattern: frame.name,
+        pattern_source: frame.re.source,
+        match: m[0],
       });
     }
   }

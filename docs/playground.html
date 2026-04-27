@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>groundtruth playground — paste a session JSONL, see findings</title>
+<style>
+  :root {
+    --bg: #0e1117;
+    --panel: #161b22;
+    --text: #c9d1d9;
+    --dim: #8b949e;
+    --accent: #7c3aed;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --border: #30363d;
+    --code: #1f242b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 24px 32px 16px;
+  }
+  header h1 { margin: 0 0 4px; font-size: 24px; }
+  header .tag { color: var(--dim); font-size: 14px; }
+  header a { color: var(--accent); text-decoration: none; }
+  main {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    padding: 16px 32px 64px; max-width: 1400px; margin: 0 auto;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .panel h2 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--dim); }
+  textarea {
+    width: 100%; min-height: 380px; resize: vertical;
+    background: var(--code); color: var(--text);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 8px; font-family: ui-monospace, SF Mono, Menlo, monospace; font-size: 12px;
+  }
+  .row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  button {
+    background: var(--accent); color: white; border: 0; border-radius: 4px;
+    padding: 8px 16px; font-size: 14px; cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  button:hover { opacity: 0.85; }
+  .drop {
+    border: 2px dashed var(--border); border-radius: 8px; padding: 16px;
+    text-align: center; color: var(--dim); margin-bottom: 8px;
+  }
+  .drop.over { border-color: var(--accent); color: var(--text); }
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .stat { background: var(--code); border: 1px solid var(--border); border-radius: 4px; padding: 8px; }
+  .stat .num { font-size: 20px; font-weight: 600; }
+  .stat .num.red { color: var(--red); }
+  .stat .num.green { color: var(--green); }
+  .stat .num.yellow { color: var(--yellow); }
+  .stat .label { font-size: 11px; color: var(--dim); text-transform: uppercase; }
+  .finding {
+    background: var(--code); border-left: 3px solid var(--red);
+    padding: 8px 12px; margin: 6px 0; border-radius: 0 4px 4px 0;
+    font-family: ui-monospace, SF Mono, Menlo, monospace; font-size: 12px;
+  }
+  .finding.verified { border-left-color: var(--green); }
+  .finding.suppressed { border-left-color: var(--dim); opacity: 0.6; }
+  .finding .meta { color: var(--dim); font-size: 11px; margin-bottom: 2px; }
+  .finding .claim { color: var(--text); }
+  .finding .trigger { color: var(--yellow); }
+  details { margin-top: 12px; }
+  details summary { cursor: pointer; color: var(--dim); font-size: 12px; padding: 4px 0; }
+  pre { background: var(--code); padding: 8px; border-radius: 4px; overflow: auto; font-size: 11px; }
+  footer { color: var(--dim); font-size: 12px; padding: 32px; text-align: center; border-top: 1px solid var(--border); }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>groundtruth playground</h1>
+  <div class="tag">paste a Claude Code session JSONL, see findings rendered. no install. all client-side.
+    <span style="margin-left: 12px;"><a href="https://github.com/vnmoorthy/groundtruth">repo</a></span>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>Input</h2>
+    <div class="drop" id="drop">drop a .jsonl file here, or paste below</div>
+    <textarea id="input" placeholder="paste a session JSONL here, one record per line..."></textarea>
+    <div class="row">
+      <button id="run">Run audit</button>
+      <button class="secondary" id="sample">Load sample (unverified claim)</button>
+      <button class="secondary" id="sample2">Load sample (paper writing)</button>
+      <button class="secondary" id="clear">Clear</button>
+    </div>
+  </div>
+  <div class="panel" id="output">
+    <h2>Findings</h2>
+    <p style="color: var(--dim); font-size: 13px;">paste or drop a JSONL on the left, then click Run audit.</p>
+  </div>
+</main>
+
+<footer>
+  detector source: <a href="https://github.com/vnmoorthy/groundtruth/blob/main/src/detector.mjs">src/detector.mjs</a>
+  · MIT
+  · v0.1.4
+</footer>
+
+<script type="module">
+// Minimal in-browser implementation of the same logic as src/detector.mjs,
+// src/verifier.mjs, src/code-context.mjs, src/session.mjs. Kept inline so
+// the page is one file with no fetches. The patterns must mirror the
+// canonical source; bump version when src changes.
+
+// ----- detector -----
+const CLAIM_FRAMES = [
+  { name: "first-person-perfect", re: /\bI(?:'ve| have)\s+(?:now\s+|just\s+|already\s+)?(implemented|added|fixed|completed|finished|built|wired (?:it )?up|hooked (?:it )?up|landed|shipped|resolved|written|created|made|ensured|verified|tested|wired up|hooked up|updated|refactored|migrated|integrated|deployed|installed|configured|debugged|patched)\b/i },
+  { name: "subject-is-complete", re: /\b(?:the\s+\w+(?:\s+\w+){0,3}|everything|all\s+tests|the\s+tests|it|this|that)\s+(?:is|are|should be|looks)\s+(done|complete|completed|fixed|ready|shipped|resolved|finished|working(?!\s+on)|working now|passing|live|in place|set up|up and running|good to go|green)\b/i },
+  { name: "successfully-verbed", re: /\bsuccessfully\s+(implemented|added|fixed|completed|finished|built|merged|landed|deployed|shipped|resolved|integrated|tested|verified|refactored|migrated)\b/i },
+  { name: "deverbal-is-done", re: /\b(?:fix|implementation|refactor|migration|change|patch|update|integration|work|task|feature)\s+is\s+(done|complete|completed|ready|shipped|finished|live|in place)\b/i },
+  { name: "terse-closer", re: /(?:^|\n)\s*(?:\*\*)?(Done|Fixed|Complete|Completed|Shipped|Ready|All\s+set|All\s+good|All\s+working|Works(?:!\s*)?|Passing|Green)(?:\*\*)?[.!\s]*(?:\n|$)/i },
+  { name: "checklist-past-tense", re: /(?:^|\n)\s*(?:[-*+]\s+(?:\[[xX]\]\s+)?|\d+\.\s+)(?:Implemented|Added|Fixed|Completed|Finished|Built|Shipped|Landed|Resolved|Wired up|Hooked up|Migrated|Integrated|Deployed|Configured|Refactored|Tested|Verified|Merged)\s+/ },
+  { name: "tests-pass", re: /\b(?:the\s+)?tests?\s+(pass|passes|passing|are passing)\b/i },
+  { name: "you-are-done", re: /\bYou(?:'re| are)\s+(all set|good to go|done|ready)\b/i },
+];
+
+const EXCLUSION_PATTERNS = [
+  /\b(?:I'm|I am|currently|still|now)\s+working\s+on\b/i,
+  /\bready\s+to\s+(?:continue|proceed|move|go|start|begin|look|check|try|test|run|write|edit|implement|investigate|dig|see|hear|discuss|review|examine|explore|understand|learn|help|assist)\b/i,
+  /\bworking\s+as\s+(?:expected|intended|designed|documented|specified)\b/i,
+  /\bworking\s+(?:example|code|implementation|copy|version|directory|tree|branch|state|setup|solution)\b/i,
+  /\bcomplete\s+(?:with|set|list|picture|overview|rewrite|coverage)\b/i,
+  /\b(?:almost|nearly|about to be|soon)\s+(?:done|ready|complete|finished)\b/i,
+  /\bpreviously\s+(?:fixed|implemented|added|resolved)\b/i,
+  /\b(?:if|when|once|unless|whether|assuming)\s+(?:it\s+|that\s+|this\s+)?(?:is|are|was|were)\s+(?:working|done|ready|fixed|complete)\b/i,
+  /\?\s*$/,
+  /\b(?:bun|node|npm|pnpm|yarn|deno|cargo|go|pytest|jest|vitest|typescript)(?:'s)?\s+\w+\s+works\b/i,
+  /\b(?:papers?|manuscripts?|drafts?|abstracts?|chapters?|paragraphs?|sentences?|essays?|theses?|dissertations?|articles?|sections?|subsections?|appendices|appendix|bibliograph(?:y|ies)|figures?|tables?|charts?|diagrams?|slides?|decks?|presentations?|posters?|outlines?|submissions?)\b(?:[\s\w-]{0,60}?)\s+(?:is|are|were|was|has been|have been|already)\s+(?:done|complete|completed|fixed|ready|shipped|resolved|finished|live|in place|integrated|verified|added|edited|reviewed|submitted|accepted)\b/i,
+  /<\/?(?:completed|next[_\s-]?steps?|fact|facts|status|progress|progress[_\s-]?update|achievement|achievements|milestone|milestones|verified|done|finished|outcome|outcomes|result|results|summary|note|notes|observation|observations)\b/i,
+  /\bpaper\s+(?:editing|writing|preparation|drafting|review|revision|revisions|formatting|cleanup|polish(?:ing)?|optimization|optimisation|copy[\s-]?edit(?:ing)?|proof(?:reading)?)\b/i,
+  /\b(?:intellectual|scholarly|academic|editorial|literary|expository|argumentative|narrative|qualitative|conceptual)\b\s+(?:and\s+\w+\s+)?(?:work|tasks?|effort|content|writing|preparation)\b/i,
+  /\b(?:anonymous|final|first|second|third|camera-ready|revised|polished|copy-?edited|proof(?:read|ed)?|publication[\s-]?ready)\s+\w*\s*version\b\s+(?:is|are|was|were|has been|have been)\s+\w+\b/i,
+  /\b(?:citations?|references?|footnotes?|endnotes?|bibliograph(?:y|ies)|bibtex|cite\s*keys?)\b\s+(?:successfully|now)?\s*(?:integrated|resolved|added|verified|formatted|reviewed|cleaned|cleaned\s+up|fixed|corrected|completed)\b/i,
+  /\b(?:Added|Removed|Cut|Edited|Inserted|Wrote|Rewrote|Trimmed|Pruned|Expanded|Shortened|Tweaked)\s+\d+\s+words?\b/i,
+  /\bauthor\s+(?:names?|lists?|info(?:rmation)?|details?|metadata)\b/i,
+  /(?:^|[\s_/-])(?:TMLR|NeurIPS|ICML|ICLR|CVPR|ECCV|ICCV|EMNLP|ACL|NAACL|AAAI|IJCAI|UAI|AISTATS|COLT|RSS|ICRA|IROS|JMLR|TPAMI|arXiv|OpenReview|bioRxiv|medRxiv|SSRN|Overleaf)(?:[\s_/-]|$)/,
+  /\b(?:compiled|typeset|formatted|rendered|generated)\s+(?:PDF|LaTeX|TeX|tex|pdf|HTML\s+output|epub)\b/i,
+];
+
+function stripCodeBlocks(text) {
+  let out = text.replace(/```[\s\S]*?```/g, m => " ".repeat(m.length));
+  return out.replace(/`[^`\n]+`/g, m => " ".repeat(m.length));
+}
+
+function splitSentences(text) {
+  const records = [];
+  const re = /[^.!?\n]*[.!?\n]/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[0].trim().length > 0) records.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
+  }
+  const consumed = records.length > 0 ? records[records.length - 1].end : 0;
+  if (consumed < text.length) {
+    const tail = text.slice(consumed);
+    if (tail.trim()) records.push({ start: consumed, end: text.length, text: tail });
+  }
+  return records;
+}
+
+function detectClaims(text) {
+  if (!text) return [];
+  const stripped = stripCodeBlocks(text);
+  const sentences = splitSentences(stripped);
+  const out = [];
+  const seen = new Set();
+  for (const s of sentences) {
+    if (EXCLUSION_PATTERNS.some(re => re.test(s.text))) continue;
+    for (const f of CLAIM_FRAMES) {
+      const m = f.re.exec(s.text);
+      if (!m) continue;
+      const word = (m[1] || m[0]).trim();
+      const key = `${s.start + m.index}:${word}:${f.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ word, sentence: s.text.trim(), pattern: f.name, match: m[0] });
+    }
+  }
+  return out;
+}
+
+// ----- verifier (subset; matches src/verifier.mjs intent) -----
+const TEST_CMD = /\b(npm|pnpm|yarn|bun|node\s+--test|deno\s+test|jest|vitest|mocha|tap|pytest|cargo\s+test|go\s+test|phpunit|rspec)\b/;
+const TYPECHECK_CMD = /\b(tsc|mypy|pyright|flow\s+check)\b/;
+const BUILD_CMD = /\b(npm\s+run\s+build|pnpm\s+run\s+build|yarn\s+build|cargo\s+build|go\s+build|make)\b/;
+const SUCCESS_RE = /(\bpass(?:ed|es|ing)?\b|\b\d+\s+pass(?:ed|es|ing)\b|^\s*#\s*pass(?:ed)?\s+[1-9]\d*\b|\bok\b|exit code 0|Build succeeded|✓|PASS|test result:\s*ok)/im;
+const FAIL_RE = /(\bFAIL\b|\bAssertionError\b|^Error:|✗|exit code [1-9])/m;
+function classifyBash(cmd, output) {
+  let kind = null;
+  if (TEST_CMD.test(cmd)) kind = "test";
+  else if (TYPECHECK_CMD.test(cmd)) kind = "typecheck";
+  else if (BUILD_CMD.test(cmd)) kind = "build";
+  if (!kind) return null;
+  const ok = SUCCESS_RE.test(output) && !FAIL_RE.test(output);
+  return { kind, ok };
+}
+
+// ----- code context filter -----
+const CODE_EXT = /\.(js|jsx|ts|tsx|mjs|cjs|py|rb|go|rs|java|kt|swift|c|cc|cpp|h|hpp|cs|php|sh|bash|sql|graphql|json|jsonl|yaml|yml|toml|html|css|scss|sass|less|vue|svelte|elm|hs|lua|jl|dart|nim|zig|ex|exs|erl|clj|tf|hcl|nix|sol|mod|sum)\b/i;
+const TRIPLE_FENCED = /```[\s\S]+?```/m;
+function hasCodeContext(text, obs) {
+  for (const o of obs || []) {
+    if (!o || !o.tool) continue;
+    if (o.tool === "Bash" || o.tool === "BashOutput") return true;
+    if (["Write","Edit","MultiEdit","NotebookEdit"].includes(o.tool)) {
+      const p = o.input?.file_path || o.input?.path || "";
+      if (CODE_EXT.test(p)) return true;
+    }
+  }
+  return TRIPLE_FENCED.test(text || "");
+}
+
+// ----- session JSONL parser -----
+function parseSession(jsonl) {
+  const lines = jsonl.split("\n").map(l => l.trim()).filter(Boolean);
+  const turns = [];
+  let cur = null;
+  let idx = 0;
+  for (const line of lines) {
+    let r;
+    try { r = JSON.parse(line); } catch { continue; }
+    if (r.isMeta) continue;
+    const msg = r.message || r;
+    const role = msg.role || r.type;
+    if (role !== "assistant" && role !== "user") continue;
+    const content = msg.content;
+    let text = "";
+    const uses = [];
+    const results = [];
+    if (Array.isArray(content)) {
+      for (const b of content) {
+        if (!b) continue;
+        if (b.type === "text" && typeof b.text === "string") text += (text ? "\n" : "") + b.text;
+        if (b.type === "tool_use") uses.push({ tool: b.name, input: b.input || {}, tool_use_id: b.id });
+        if (b.type === "tool_result") {
+          const c = typeof b.content === "string" ? b.content :
+            Array.isArray(b.content) ? b.content.map(x => typeof x === "string" ? x : x?.text || "").join("\n") : "";
+          results.push({ tool_use_id: b.tool_use_id, content: c });
+        }
+      }
+    } else if (typeof content === "string") {
+      text = content;
+    }
+    if (role === "assistant") {
+      if (!cur || cur.kind !== "assistant") {
+        cur = { index: idx++, kind: "assistant", text: "", tool_uses: [], tool_results: [], timestamp: r.timestamp };
+        turns.push(cur);
+      }
+      if (text) cur.text = cur.text ? `${cur.text}\n${text}` : text;
+      cur.tool_uses.push(...uses);
+    } else {
+      if (results.length > 0 && cur && cur.kind === "assistant") {
+        cur.tool_results.push(...results);
+      } else {
+        cur = { index: idx++, kind: "user", text, tool_uses: [], tool_results: [], timestamp: r.timestamp };
+        turns.push(cur);
+      }
+    }
+  }
+  return turns;
+}
+
+function obsForTurn(t) {
+  const map = new Map();
+  for (const r of t.tool_results) map.set(r.tool_use_id, r);
+  return t.tool_uses.map(u => ({
+    tool: u.tool, input: u.input,
+    output: map.get(u.tool_use_id)?.content || "",
+  }));
+}
+
+// ----- audit -----
+function audit(jsonl) {
+  const turns = parseSession(jsonl);
+  const findings = [];
+  let verified = 0, suppressed = 0, assistantTurns = 0;
+  for (const t of turns) {
+    if (t.kind !== "assistant") continue;
+    assistantTurns += 1;
+    const claims = detectClaims(t.text);
+    if (claims.length === 0) continue;
+    const obs = obsForTurn(t);
+    const verifs = obs.map(o => o.tool === "Bash" || o.tool === "BashOutput" ? classifyBash(o.input?.command || "", o.output || "") : null).filter(v => v && v.ok);
+    if (verifs.length > 0) { verified += 1; continue; }
+    if (!hasCodeContext(t.text, obs)) { suppressed += claims.length; continue; }
+    for (const c of claims) findings.push({ ...c, turn: t.index, timestamp: t.timestamp });
+  }
+  return { findings, verified, suppressed, total_turns: turns.length, assistant_turns: assistantTurns };
+}
+
+// ----- UI -----
+const $ = id => document.getElementById(id);
+const drop = $("drop");
+const input = $("input");
+const out = $("output");
+
+function render(report) {
+  const html = [];
+  html.push('<h2>Findings</h2>');
+  html.push('<div class="summary">');
+  html.push(`<div class="stat"><div class="num">${report.assistant_turns}</div><div class="label">turns</div></div>`);
+  html.push(`<div class="stat"><div class="num green">${report.verified}</div><div class="label">verified</div></div>`);
+  html.push(`<div class="stat"><div class="num ${report.findings.length ? "red" : "green"}">${report.findings.length}</div><div class="label">unverified</div></div>`);
+  html.push(`<div class="stat"><div class="num yellow">${report.suppressed}</div><div class="label">suppressed</div></div>`);
+  html.push('</div>');
+  if (report.findings.length === 0) {
+    html.push('<p style="color: var(--dim);">No unverified completion claims found. ' +
+      (report.assistant_turns === 0 ? 'No assistant turns parsed; check the JSONL format.' : 'Either every claim was verified or every claim was non-code.')+ '</p>');
+  } else {
+    for (const f of report.findings) {
+      html.push('<div class="finding">');
+      html.push(`<div class="meta">turn ${f.turn} · pattern <strong>${f.pattern}</strong> · trigger <span class="trigger">${escape(f.word)}</span></div>`);
+      html.push(`<div class="claim">"${escape(f.sentence.length > 240 ? f.sentence.slice(0, 240) + "…" : f.sentence)}"</div>`);
+      html.push('</div>');
+    }
+  }
+  html.push('<details><summary>raw report (JSON)</summary><pre>' + escape(JSON.stringify(report, null, 2)) + '</pre></details>');
+  out.innerHTML = html.join("");
+}
+
+function escape(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+$("run").onclick = () => {
+  try {
+    const r = audit(input.value);
+    render(r);
+  } catch (err) {
+    out.innerHTML = `<h2>Findings</h2><p style="color: var(--red);">Error: ${escape(err.message)}</p>`;
+  }
+};
+$("clear").onclick = () => { input.value = ""; out.innerHTML = '<h2>Findings</h2><p style="color: var(--dim); font-size: 13px;">paste or drop a JSONL on the left, then click Run audit.</p>'; };
+
+const SAMPLE_UNVERIFIED = `{"type":"user","message":{"role":"user","content":"Add a hello() function to src/greet.mjs."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll create the file."},{"type":"tool_use","id":"a1","name":"Write","input":{"file_path":"/tmp/demo/src/greet.mjs","content":"export function hello(){return 'hi'}"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"a1","content":"File written."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I've implemented the hello() function. Done."}]}}`;
+
+const SAMPLE_PAPER = `{"type":"user","message":{"role":"user","content":"Status?"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"<completed>Paper editing and optimization work is complete. The papers are ready for final review or submission. 51 citations successfully resolved.</completed>"}]}}`;
+
+$("sample").onclick = () => { input.value = SAMPLE_UNVERIFIED; $("run").click(); };
+$("sample2").onclick = () => { input.value = SAMPLE_PAPER; $("run").click(); };
+
+// drag-drop
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => {
+  e.preventDefault(); drop.classList.remove("over");
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { input.value = r.result; $("run").click(); };
+  r.readAsText(f);
+});
+</script>
+</body>
+</html>

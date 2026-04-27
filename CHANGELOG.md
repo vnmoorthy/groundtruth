@@ -4,6 +4,150 @@ All notable changes to this project are recorded here.
 Format follows [keepachangelog.com](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [semver.org](https://semver.org).
 
+## [0.1.9] — 2026-04-25
+
+Multi-angle review pass: ran the equivalent of CEO / engineering / devex / security / design critiques on the project and shipped the highest-leverage fixes.
+
+### Added
+
+- **`groundtruth demo`** — runs the live hook flow against a built-in two-scene fixture (unverified claim → block, verified claim → allow) and prints what the gate decides at each step. Time-to-first-block goes from "wait until it happens in a real session" to ~5 seconds after install. Set `GROUNDTRUTH_DEMO_FAST=1` to skip the typing pauses. This is the highest-leverage devex fix the review surfaced.
+- **`SECURITY.md`** — honest threat model. Walks through what the hook can do (run as user, no network), what it doesn't do (no telemetry, no credentials, no third-party deps), and the realistic threats with their mitigations. Verifiable claims: `cat package.json | jq .dependencies` returns null, `grep -r "fetch\|http" src/ bin/` returns nothing.
+- **`ROADMAP.md`** — what groundtruth might do later, organized into "sharper at the one thing" / "better evaluation surface" / "composition with the ecosystem" / "the bigger product hiding inside" / "out of scope on purpose." Captures the multi-angle review notes verbatim so future scope decisions can reference the analysis.
+
+### Test count
+
+135 tests pass (unchanged — these were UX, docs, and roadmap additions).
+
+### What this release explicitly is NOT
+
+I considered building groundtruth's own version of gstack's 24-command suite (`/plan-ceo-review`, `/ship`, `/qa`, etc.). Decided against. groundtruth's value is being narrow; reproducing a workflow tool would dilute the calibration story. ROADMAP.md captures this decision under "Out of scope, on purpose."
+
+## [0.1.8] — 2026-04-25
+
+Transparency and documentation pass. Three additions, no behavior changes.
+
+### Added
+
+- **`groundtruth list-patterns`** (alias `groundtruth patterns`) — prints every claim frame, every exclusion pattern, every recognized test/build/lint/typecheck/http command, plus the code-context rules. `--json` for machine consumers. Closes the "what does this thing actually check for?" question without requiring source-code reading.
+- **`docs/FAQ.md`** — 11 question-answer pairs covering performance, false-positive handling, scope of the code-context filter, temporary disabling, memory-hook tradeoffs, gstack/superpowers composition, the dogfooding rule, and protocol stability.
+- **`docs/COMPARISON.md`** — worked side-by-side examples of the same buggy session against groundtruth, gstack `/ship`, superpowers, decider/claude-hooks, claude-flow, and disler/claude-code-hooks-mastery. Positions groundtruth honestly without disparaging the others.
+
+### Fixed
+
+- README documentation drift: claimed "27 exclusion patterns" — the actual count after several iterations of consolidation is 21. The new `list-patterns` command surfaced the inconsistency. README and FAQ now state 21 and refer to `list-patterns` for the live count.
+
+### Test count
+
+135 tests pass (unchanged).
+
+## [0.1.7] — 2026-04-25
+
+Three more user-facing additions, plus a community-driven detector improvement triggered by the new contribution loop.
+
+### Added
+
+- **`groundtruth bench`** — runs the full audit against the user's actual `~/.claude/projects/` history, reports per-thousand-turn timing on their hardware, and prints a tweet-ready string ("groundtruth audit: N turns in M ms on my macOS-arm64"). Designed to be the number people share when they install. `--json` for machine consumers.
+- **`groundtruth fixture add <sentence>`** — turns a real false-positive (or true-positive) report into a permanent fixture in one command. Appends the sentence to `test/fixtures/community-{false,true}-positives.txt` and ensures the auto-generated `test/community-fixtures.test.mjs` exercises it on every `node --test`. Closes the contribution loop: user paste → captured fixture → regression test → detector fix.
+- **`tools/demo.tape`** — a [vhs](https://github.com/charmbracelet/vhs) script that records the 30-second README demo as an animated GIF. Five scenes: install line, unverified-claim audit, verified-claim audit, live Stop-hook block, closing card with the playground URL. Output: `docs/demo.gif`. Run with `vhs tools/demo.tape` after `brew install charmbracelet/tap/vhs`.
+
+### Changed (driven by the fixture-add loop)
+
+- `src/detector.mjs` — added an exclusion for "team / audience / stakeholders / etc. is ready for the demo / talk / launch / etc." phrasings. Surfaced when the first community-fixture line ("The team is ready for the demo.") was captured and the auto-generated test failed against the existing detector. The full loop ran end-to-end on the same release, demonstrating the contribution path works.
+
+### Test count
+
+135 tests pass (was 133). The two new tests are auto-generated by `groundtruth fixture add` and live in `test/community-fixtures.test.mjs`.
+
+## [0.1.6] — 2026-04-25
+
+Visual identity and credibility-number pass. Three additions, all aimed at increasing the conversion rate from "saw the link" to "tried the tool."
+
+### Added
+
+- **`docs/index.html`** — a proper landing page, separate from the README. Designed to be the URL someone clicks through to from a tweet, an HN comment, or a launch post. Embeds the logo, the live in-vivo demo, the calibration table, the comparison vs gstack/superpowers/decider, the playground link, and the install one-liner. Hostable via the same GitHub Pages deployment as the playground.
+- **`docs/logo.svg`** — visual identity. Octagon (stop sign) with a check mark. Inline SVG, no fonts loaded, ~1.2KB. Used in the landing page hero and embeddable in the README via raw.githubusercontent.com.
+- **`test/perf.test.mjs`** — benchmark + regression budget. Synthesizes a 1,000-turn session, runs the full audit, asserts wall-clock under 5,000ms. Real measurement: **27ms for 1,000 turns, 1ms for 100 turns.** That number is the new credibility signal in the README.
+
+### Test count
+
+133 tests pass (up from 131).
+
+### Measured performance
+
+| corpus size | audit time |
+| ---: | --- |
+| 100 turns | ~1 ms |
+| 1,000 turns | ~27 ms |
+| 50 turns × 100 sessions = 5,000 turns | extrapolated ~135 ms |
+
+Audit is functionally instant for any realistic user history. The bottleneck for users with very large histories will be JSONL disk read, not detection or verification.
+
+### What this release is not
+
+This release adds polish and marketing surface. It does not change the detector, the verifier, the code-context filter, the hook protocol, or the Stop hook semantics. v0.1.0–v0.1.5 behavior is preserved exactly.
+
+## [0.1.5] — 2026-04-25
+
+Coverage debt closeout plus two new diagnostic / scaffolding commands.
+
+### Added
+
+- **`groundtruth doctor`** — reports whether your environment is wired correctly. Checks Node version, claude binary on PATH, `~/.claude` existence, `settings.json` validity and Stop hook registration, PreToolUse memory hook registration, `~/.local/bin` on PATH, `~/.config/gh` writability (we hit a real permission issue here in earlier sessions), and the presence of any `.groundtruthrc.json`. Outputs PASS / WARN / FAIL per check. Exits non-zero on any FAIL. Supports `--json` for CI consumption.
+- **`groundtruth init`** — scaffolds a starter `.groundtruthrc.json` with commented examples. Writes to `~/.groundtruthrc.json` by default; pass `--here` for cwd, `--force` to overwrite. Lowers the barrier to using the per-user config feature added in 0.1.4.
+- **Tests for v0.1.4 features** (paying down the coverage debt I documented in 0.1.4):
+  - `test/config.test.mjs` — config loader, glob matching, malformed-JSON tolerance
+  - `test/stats.test.mjs` — verification rate, claim rate, per-day breakdown
+  - `test/replay.test.mjs` — outcome classification across all four fixture types
+  - `test/memory-hook.test.mjs` — PreToolUse JSON in / permissionDecision out
+  - `test/doctor-init.test.mjs` — diagnostic and scaffolding flows
+  - 27 new tests in total
+
+### Test count
+
+131 tests pass (was 104).
+
+### CLI surface
+
+```
+groundtruth audit       walk session JSONLs
+groundtruth check       per-file audit
+groundtruth hook        Stop hook entry point (called by Claude Code)
+groundtruth memory-hook PreToolUse entry point (called by Claude Code)
+groundtruth memory-check  memory-write check on demand
+groundtruth replay      what would the gate have done on this past session?
+groundtruth stats       verification rate + claim rate over your history
+groundtruth doctor      diagnostic: is everything wired correctly?
+groundtruth init        scaffold a .groundtruthrc.json
+groundtruth install     register the Stop hook + skill (idempotent)
+groundtruth uninstall   remove them (with backup)
+groundtruth status      what's registered
+groundtruth version     print version
+```
+
+## [0.1.4] — 2026-04-25
+
+Seven-iteration value pass before public marketing. Each piece adds capability without expanding scope; groundtruth still does one thing (block unverified completion claims), but with better debug, better customization, better visibility, and a no-install evaluation path.
+
+### Added
+
+- **`--explain` flag** on `audit` and `check`. When a finding fires, also prints the matched substring, the regex source that fired, and the path to the file that lists exclusion patterns. Reduces "why did this fire?" debugging from a grep-the-source task to a one-line read.
+- **`.groundtruthrc.json` user config**. Loaded from `$GROUNDTRUTH_CONFIG`, then `./`, then `~/`. Schema accepts `exclude_patterns` (regex sources), `exclude_paths` (glob-ish), `extra_test_commands`, `extra_build_commands`. Lets users calibrate to their own prose without forking. See `src/config.mjs`.
+- **`groundtruth stats`** subcommand. Verification rate, claim rate, block rate, plus a per-day breakdown over the last 14 days. Answers "is this thing actually catching anything?" with numbers.
+- **`groundtruth replay <session.jsonl>`** subcommand. Walks a past session and prints, per-turn, what the gate would have done if it had been live. Useful for retros and onboarding.
+- **PreToolUse memory hook**. Opt-in at install with `--with-memory-gate`. Registers a `PreToolUse` hook that fires automatically on `Write|Edit|MultiEdit|NotebookEdit` against `MEMORY.md`/`NOTES.md`/`LEARNINGS.md`/`.claude/memory/*` and rejects writes whose content contains unverified claims. Closes the documented limitation in ARCHITECTURE.md.
+- **Install ergonomics**. New flags on `groundtruth install`: `--dry-run` (prints what would change without writing), `--no-skill` (skip skill copy), `--no-hook` (skip Stop hook registration), `--with-memory-gate` (also register PreToolUse). Better backup messaging.
+- **Web playground at `docs/playground.html`**. Pure-client HTML (no fetches, no server) that mirrors the detector + verifier + code-context filter. Drop a session JSONL or paste it in, see findings rendered. **Lets anyone evaluate groundtruth in 10 seconds without installing.** Distribution unlock for HN/Reddit/Twitter posts. Hostable via GitHub Pages.
+
+### Changed
+
+- `auditSession`/`auditSessions` now load and apply user config automatically.
+- `uninstallHook` now also removes registered PreToolUse hooks.
+- Audit findings carry `match` (the actual matched substring) and `pattern_source` (the regex source) when `--explain` is set, on top of the existing `pattern` name.
+
+### Test count
+
+104 tests pass. (No new tests this release — the new commands are wrappers around existing tested primitives. Future release will add coverage for stats/replay/config/memory-hook.)
+
 ## [0.1.3] — 2026-04-24
 
 The 0.1.2 code-context filter dropped findings from 30 to 5 against the same real corpus, but the remaining 5 were all paper-writing claims slipping through because the academic-flavored sessions contained code-language fenced blocks (Python data analysis, SQL examples) that satisfied the code-context filter while the actual claim was about manuscript work.

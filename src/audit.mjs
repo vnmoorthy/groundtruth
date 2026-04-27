@@ -10,6 +10,7 @@ import { parseSessionFile, observationsForTurn } from "./session.mjs";
 import { detectClaims } from "./detector.mjs";
 import { detectVerifications } from "./verifier.mjs";
 import { hasCodeContext } from "./code-context.mjs";
+import { loadConfig, pathIsExcluded } from "./config.mjs";
 
 /** @typedef {{
  *   file: string,
@@ -19,7 +20,9 @@ import { hasCodeContext } from "./code-context.mjs";
  *   line_end?: number,
  *   claim: string,
  *   word: string,
- *   pattern: string
+ *   pattern: string,
+ *   pattern_source?: string,
+ *   match?: string
  * }} Finding
  */
 
@@ -99,6 +102,17 @@ export function defaultSessionFiles(limit = 20) {
  * @param {{ includeNonCode?: boolean }} [opts]
  */
 export function auditSession(filePath, opts = {}) {
+  const config = opts.config || loadConfig();
+  if (pathIsExcluded(filePath, config.exclude_paths)) {
+    return {
+      findings: [],
+      verified: 0,
+      suppressed_non_code: 0,
+      total_turns: 0,
+      files_scanned: 1,
+      excluded_by_config: true,
+    };
+  }
   const turns = parseSessionFile(filePath);
   /** @type {Finding[]} */
   const findings = [];
@@ -106,7 +120,7 @@ export function auditSession(filePath, opts = {}) {
   let suppressedCount = 0;
   for (const turn of turns) {
     if (turn.kind !== "assistant") continue;
-    const claims = detectClaims(turn.text);
+    const claims = detectClaims(turn.text, { extraExclusions: config.exclude_patterns });
     if (claims.length === 0) continue;
     const obs = observationsForTurn(turn);
     const verifs = detectVerifications(obs);
@@ -128,6 +142,8 @@ export function auditSession(filePath, opts = {}) {
         claim: claim.sentence,
         word: claim.word,
         pattern: claim.pattern,
+        pattern_source: claim.pattern_source,
+        match: claim.match,
       });
     }
   }
@@ -145,6 +161,9 @@ export function auditSession(filePath, opts = {}) {
  * @param {{ includeNonCode?: boolean }} [opts]
  */
 export function auditSessions(files, opts = {}) {
+  // Load config once and pass into every per-file call so we don't re-parse
+  // the user's .groundtruthrc.json N times.
+  const config = opts.config || loadConfig();
   /** @type {AuditReport} */
   const report = {
     findings: [],
@@ -152,10 +171,16 @@ export function auditSessions(files, opts = {}) {
     suppressed_non_code: 0,
     total_turns: 0,
     files_scanned: 0,
+    excluded_by_config: 0,
+    config_loaded_from: config.loaded_from,
   };
   for (const f of files) {
     try {
-      const r = auditSession(f, opts);
+      const r = auditSession(f, { ...opts, config });
+      if (r.excluded_by_config) {
+        report.excluded_by_config += 1;
+        continue;
+      }
       report.findings.push(...r.findings);
       report.verified += r.verified;
       report.suppressed_non_code += r.suppressed_non_code || 0;
@@ -218,6 +243,19 @@ export function renderReport(report, opts = {}) {
       const claim = f.claim.length > 160 ? `${f.claim.slice(0, 160)}…` : f.claim;
       lines.push(`    claim: ${c("red", `"${claim}"`)}`);
       lines.push(`    trigger: ${c("magenta", f.word)}`);
+      if (opts.explain) {
+        if (f.match) lines.push(`    matched: ${c("yellow", `"${f.match}"`)}`);
+        if (f.pattern_source) {
+          const truncated =
+            f.pattern_source.length > 220
+              ? `${f.pattern_source.slice(0, 220)}…`
+              : f.pattern_source;
+          lines.push(`    regex:   ${c("dim", `/${truncated}/i`)}`);
+        }
+        lines.push(
+          `    fix:     add a sentence to test/fixtures/false-positives.jsonl, then a regex to EXCLUSION_PATTERNS in src/detector.mjs`,
+        );
+      }
     }
     lines.push("");
   }

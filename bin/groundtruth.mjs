@@ -17,6 +17,15 @@ import { auditSessions, renderReport, renderReportJson, renderReportSarif, disco
 import { runHook } from "../src/hook-entry.mjs";
 import { installHook, uninstallHook, showStatus } from "../src/install.mjs";
 import { runMemoryCheck } from "../src/memory-gate.mjs";
+import { runStats } from "../src/stats.mjs";
+import { runReplay } from "../src/replay.mjs";
+import { runMemoryHook } from "../src/memory-hook-entry.mjs";
+import { runDoctor } from "../src/doctor.mjs";
+import { runInit } from "../src/init.mjs";
+import { runBench } from "../src/bench.mjs";
+import { runFixtureAdd } from "../src/fixture-add.mjs";
+import { runListPatterns } from "../src/list-patterns.mjs";
+import { runDemo } from "../src/demo.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
@@ -70,6 +79,7 @@ function parseFlags(args) {
     failOn: 1,
     color: null,
     includeNonCode: false,
+    explain: false,
   };
   const positional = [];
   for (let i = 0; i < args.length; i++) {
@@ -77,6 +87,7 @@ function parseFlags(args) {
     if (a === "--json") flags.json = true;
     else if (a === "--sarif") flags.sarif = true;
     else if (a === "--all" || a === "--include-non-code") flags.includeNonCode = true;
+    else if (a === "--explain" || a === "-e") flags.explain = true;
     else if (a === "--limit") {
       const n = parseInt(args[++i], 10);
       if (!Number.isNaN(n) && n > 0) flags.limit = n;
@@ -117,7 +128,7 @@ async function main() {
       } else if (flags.json) {
         process.stdout.write(renderReportJson(report) + "\n");
       } else {
-        process.stdout.write(renderReport(report) + "\n");
+        process.stdout.write(renderReport(report, { explain: flags.explain }) + "\n");
       }
       process.exit(report.findings.length >= flags.failOn ? 1 : 0);
       break;
@@ -130,7 +141,7 @@ async function main() {
       }
       const files = discoverFromArgs(positional);
       const report = auditSessions(files, { includeNonCode: flags.includeNonCode });
-      process.stdout.write(renderReport(report, { footer: false }) + "\n");
+      process.stdout.write(renderReport(report, { footer: false, explain: flags.explain }) + "\n");
       process.exit(report.findings.length > 0 ? 1 : 0);
       break;
     }
@@ -138,12 +149,61 @@ async function main() {
       await runHook();
       break;
     }
+    case "memory-hook": {
+      await runMemoryHook();
+      break;
+    }
     case "memory-check": {
       await runMemoryCheck(rest);
       break;
     }
+    case "stats": {
+      await runStats(rest);
+      break;
+    }
+    case "replay": {
+      await runReplay(rest);
+      break;
+    }
+    case "doctor": {
+      await runDoctor(rest, { repoRoot: REPO_ROOT });
+      break;
+    }
+    case "init": {
+      await runInit(rest);
+      break;
+    }
+    case "bench": {
+      await runBench(rest);
+      break;
+    }
+    case "fixture": {
+      const sub = rest[0];
+      if (sub === "add") {
+        await runFixtureAdd(rest.slice(1));
+      } else {
+        process.stderr.write("groundtruth fixture: subcommand required (add)\n");
+        process.exit(2);
+      }
+      break;
+    }
+    case "list-patterns":
+    case "patterns": {
+      await runListPatterns(rest);
+      break;
+    }
+    case "demo": {
+      await runDemo();
+      break;
+    }
     case "install": {
-      await installHook({ repoRoot: REPO_ROOT });
+      const opts = {
+        dryRun: rest.includes("--dry-run"),
+        noSkill: rest.includes("--no-skill"),
+        noHook: rest.includes("--no-hook"),
+        withMemoryGate: rest.includes("--with-memory-gate"),
+      };
+      await installHook({ repoRoot: REPO_ROOT, opts });
       break;
     }
     case "uninstall": {

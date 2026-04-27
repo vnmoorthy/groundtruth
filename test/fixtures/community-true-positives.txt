@@ -1,0 +1,2 @@
+# Community-contributed sentences. One per line. Lines starting with # are comments.
+I've implemented the new retry logic.

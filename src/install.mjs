@@ -16,6 +16,7 @@ const SETTINGS_PATH = join(CLAUDE_HOME, "settings.json");
 const SKILL_INSTALL_DIR = join(CLAUDE_HOME, "skills", "groundtruth");
 
 const HOOK_MARKER = "groundtruth:stop";
+const MEMORY_HOOK_MARKER = "groundtruth:memory";
 
 function readSettings() {
   if (!existsSync(SETTINGS_PATH)) return {};
@@ -48,14 +49,24 @@ function log(msg) {
 
 function hookCommandFor(repoRoot) {
   const hookPath = resolve(repoRoot, "bin", "groundtruth.mjs");
-  // Use `node` to run the script. The shell wrapper is unnecessary.
   return `node "${hookPath}" hook`;
+}
+
+function memoryHookCommandFor(repoRoot) {
+  const hookPath = resolve(repoRoot, "bin", "groundtruth.mjs");
+  return `node "${hookPath}" memory-hook`;
 }
 
 function ensureStopHookArray(settings) {
   if (!settings.hooks) settings.hooks = {};
   if (!Array.isArray(settings.hooks.Stop)) settings.hooks.Stop = [];
   return settings.hooks.Stop;
+}
+
+function ensurePreToolUseArray(settings) {
+  if (!settings.hooks) settings.hooks = {};
+  if (!Array.isArray(settings.hooks.PreToolUse)) settings.hooks.PreToolUse = [];
+  return settings.hooks.PreToolUse;
 }
 
 function alreadyInstalled(stopArray, command) {
@@ -85,46 +96,81 @@ function copyDirSync(src, dst) {
   }
 }
 
-export async function installHook({ repoRoot }) {
+export async function installHook({ repoRoot, opts = {} }) {
   const command = hookCommandFor(repoRoot);
+  const memoryHookCmd = memoryHookCommandFor(repoRoot);
   log("groundtruth install");
+  if (opts.dryRun) log("  (dry run — no files will be written)");
   log("");
 
   // 1. Copy the skill to ~/.claude/skills/groundtruth/
   const skillSrc = resolve(repoRoot, "skills", "groundtruth");
-  if (existsSync(skillSrc)) {
+  if (opts.noSkill) {
+    log("  --no-skill: skipping skill install");
+  } else if (existsSync(skillSrc)) {
     if (existsSync(SKILL_INSTALL_DIR)) {
-      log(`  skill dir already present at ${SKILL_INSTALL_DIR} — overwriting SKILL.md`);
+      log(`  skill dir already present at ${SKILL_INSTALL_DIR} — would overwrite SKILL.md`);
     }
-    copyDirSync(skillSrc, SKILL_INSTALL_DIR);
-    log(`  installed skill → ${SKILL_INSTALL_DIR}`);
+    if (!opts.dryRun) {
+      copyDirSync(skillSrc, SKILL_INSTALL_DIR);
+      log(`  installed skill → ${SKILL_INSTALL_DIR}`);
+    } else {
+      log(`  would install skill → ${SKILL_INSTALL_DIR}`);
+    }
   } else {
     log(`  warning: skill source missing at ${skillSrc}`);
   }
 
   // 2. Register the Stop hook in settings.json
-  const settings = readSettings();
-  const stopArray = ensureStopHookArray(settings);
-  if (alreadyInstalled(stopArray, command)) {
-    log("  stop hook already registered — skipping");
+  if (opts.noHook) {
+    log("  --no-hook: skipping Stop hook registration");
   } else {
-    const backupPath = backup(SETTINGS_PATH);
-    if (backupPath) log(`  backed up settings → ${backupPath}`);
-    stopArray.push({
-      matcher: "",
-      hooks: [
-        {
-          type: "command",
-          command,
-          timeout: 10,
-          statusMessage: "groundtruth: checking for unverified completion claims",
-          // Marker so future installs/uninstalls can find us
-          _marker: HOOK_MARKER,
-        },
-      ],
-    });
-    writeSettings(settings);
-    log(`  registered stop hook → ${SETTINGS_PATH}`);
+    const settings = readSettings();
+    const stopArray = ensureStopHookArray(settings);
+    if (alreadyInstalled(stopArray, command)) {
+      log("  stop hook already registered — skipping");
+    } else {
+      if (!opts.dryRun) {
+        const backupPath = backup(SETTINGS_PATH);
+        if (backupPath) log(`  backed up settings → ${backupPath}`);
+      }
+      stopArray.push({
+        matcher: "",
+        hooks: [
+          {
+            type: "command",
+            command,
+            timeout: 10,
+            statusMessage: "groundtruth: checking for unverified completion claims",
+            // Marker so future installs/uninstalls can find us
+            _marker: HOOK_MARKER,
+          },
+        ],
+      });
+      // Optionally register the PreToolUse memory hook if --with-memory-gate
+      if (opts.withMemoryGate) {
+        const preArr = ensurePreToolUseArray(settings);
+        preArr.push({
+          matcher: "Write|Edit|MultiEdit|NotebookEdit",
+          hooks: [
+            {
+              type: "command",
+              command: memoryHookCmd,
+              timeout: 10,
+              statusMessage: "groundtruth: checking memory file write",
+              _marker: MEMORY_HOOK_MARKER,
+            },
+          ],
+        });
+        log("  registered PreToolUse memory hook (Write|Edit on memory paths)");
+      }
+      if (!opts.dryRun) {
+        writeSettings(settings);
+        log(`  registered stop hook → ${SETTINGS_PATH}`);
+      } else {
+        log(`  would register stop hook → ${SETTINGS_PATH}`);
+      }
+    }
   }
 
   // 3. Report composition
@@ -147,29 +193,50 @@ export async function installHook({ repoRoot }) {
 export async function uninstallHook() {
   log("groundtruth uninstall");
   log("");
-  // Remove hook from settings.json
+  // Remove hook from settings.json (Stop AND PreToolUse)
   if (existsSync(SETTINGS_PATH)) {
     const settings = readSettings();
+    let stopBefore = 0, stopAfter = 0;
     if (settings.hooks && Array.isArray(settings.hooks.Stop)) {
-      const before = settings.hooks.Stop.length;
+      stopBefore = settings.hooks.Stop.length;
       settings.hooks.Stop = settings.hooks.Stop
         .map((entry) => {
           if (!entry || !Array.isArray(entry.hooks)) return entry;
           entry.hooks = entry.hooks.filter(
-            (h) => !(h && h.command && h.command.includes("groundtruth") && h.command.includes("hook")),
+            (h) => !(h && h.command && h.command.includes("groundtruth") && (h.command.includes("hook") || h.command.includes("memory-hook"))),
           );
           return entry;
         })
         .filter((entry) => entry && Array.isArray(entry.hooks) && entry.hooks.length > 0);
-      const after = settings.hooks.Stop.length;
+      stopAfter = settings.hooks.Stop.length;
       if (settings.hooks.Stop.length === 0) delete settings.hooks.Stop;
-      if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
+    }
+    let preBefore = 0, preAfter = 0;
+    if (settings.hooks && Array.isArray(settings.hooks.PreToolUse)) {
+      preBefore = settings.hooks.PreToolUse.length;
+      settings.hooks.PreToolUse = settings.hooks.PreToolUse
+        .map((entry) => {
+          if (!entry || !Array.isArray(entry.hooks)) return entry;
+          entry.hooks = entry.hooks.filter(
+            (h) => !(h && h.command && h.command.includes("groundtruth")),
+          );
+          return entry;
+        })
+        .filter((entry) => entry && Array.isArray(entry.hooks) && entry.hooks.length > 0);
+      preAfter = settings.hooks.PreToolUse.length;
+      if (settings.hooks.PreToolUse.length === 0) delete settings.hooks.PreToolUse;
+    }
+    if (settings.hooks && Object.keys(settings.hooks).length === 0) delete settings.hooks;
+    if (stopBefore || preBefore) {
       const backupPath = backup(SETTINGS_PATH);
       if (backupPath) log(`  backed up settings → ${backupPath}`);
       writeSettings(settings);
-      log(`  removed ${before - after} stop hook entr${before - after === 1 ? "y" : "ies"}`);
+      const stopRemoved = stopBefore - stopAfter;
+      const preRemoved = preBefore - preAfter;
+      if (stopRemoved > 0) log(`  removed ${stopRemoved} stop hook entr${stopRemoved === 1 ? "y" : "ies"}`);
+      if (preRemoved > 0) log(`  removed ${preRemoved} PreToolUse hook entr${preRemoved === 1 ? "y" : "ies"}`);
     } else {
-      log("  no stop hooks configured — nothing to remove");
+      log("  no groundtruth hooks configured — nothing to remove");
     }
   } else {
     log(`  no settings at ${SETTINGS_PATH} — nothing to remove`);

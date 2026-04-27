@@ -3,10 +3,12 @@
 # groundtruth
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![tests](https://img.shields.io/badge/tests-104%20passing-brightgreen)](test/)
+[![tests](https://img.shields.io/badge/tests-135%20passing-brightgreen)](test/)
+[![audit](https://img.shields.io/badge/audit-1k%20turns%20%2F%2027ms-3fb950)](test/perf.test.mjs)
 [![node](https://img.shields.io/badge/node-%E2%89%A518-43853d)](https://nodejs.org)
 [![claude code](https://img.shields.io/badge/claude%20code-v2.1.119%20verified-7c3aed)](docs/findings.md)
-[![status](https://img.shields.io/badge/status-v0.1.3-orange)](CHANGELOG.md)
+[![status](https://img.shields.io/badge/status-v0.1.9-orange)](CHANGELOG.md)
+[![playground](https://img.shields.io/badge/try%20it-no%20install-7c3aed)](https://vnmoorthy.github.io/groundtruth/playground.html)
 
 **Stop letting Claude Code say "done" without evidence.**
 
@@ -15,6 +17,8 @@ A Stop hook for Claude Code that physically refuses to let the agent end a turn 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vnmoorthy/groundtruth/main/install.sh | bash
 ```
+
+**Don't want to install yet?** [**Try the web playground**](https://vnmoorthy.github.io/groundtruth/playground.html) — drop a Claude Code session JSONL in your browser, see findings instantly, no install required.
 
 </div>
 
@@ -64,7 +68,7 @@ The agent did not generate that retraction template on its own. The hook fed the
    └──────────────────────────┘
 ```
 
-A **claim** is syntactic: phrasings like "I've implemented X", "the bug is fixed", "Done.", "all tests pass", checklist items with past-tense verbs. The detector has 8 frames and 27 exclusion patterns tuned against a real 1,272-turn corpus.
+A **claim** is syntactic: phrasings like "I've implemented X", "the bug is fixed", "Done.", "all tests pass", checklist items with past-tense verbs. The detector has 8 frames and 21 exclusion patterns tuned against a real 1,272-turn corpus. Run `groundtruth list-patterns` to see every regex.
 
 **Evidence** is a tool observation in the same turn that matches a known shape: a passing test command, a successful type check, a successful build, a curl with a 2xx, or a Read/Grep that confirms a written symbol exists. There are 80+ command fragments recognized.
 
@@ -194,12 +198,22 @@ CHANGELOG.md         Per-release notes
 - **Verifier is heuristic.** A test that exits 0 but ran no real assertions counts as verified. Out of scope for v0.1.
 - **Adversarial agents.** The gate is for cooperating agents that occasionally round up, not for an agent intentionally evading verification. See `ARCHITECTURE.md`.
 
+## More documentation
+
+- [**FAQ**](docs/FAQ.md) — answers to the most common questions, including how to handle false positives and the code-context filter.
+- [**Comparison vs gstack / superpowers / decider-claude-hooks / claude-flow**](docs/COMPARISON.md) — the same buggy session, walked through what each tool does about it.
+- [**Architecture**](ARCHITECTURE.md) — what the gate enforces, what it can't, threat model.
+- [**Security**](SECURITY.md) — honest threat model. What the hook can and cannot do; what to read before installing.
+- [**Roadmap**](ROADMAP.md) — what groundtruth might do later, what's out of scope on purpose, and the multi-angle review notes that drove those decisions.
+- [**Hook surface findings**](docs/findings.md) — the Claude Code v2.1.119 hook protocol extracted directly from the binary.
+- [**Sharing playbook**](docs/sharing-playbook.md) — Show HN, Twitter, awesome-claude-code, and other channels with paste-ready text.
+
 ## Contributing
 
 PRs welcome, especially for:
 
 - New verifier signals (test runners, build tools, frameworks I missed)
-- False-positive fixes from your own audit results
+- False-positive fixes from your own audit results — `groundtruth fixture add "the sentence that fired"` captures it as a regression test in one command
 - Composition examples with other Claude Code skills
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md). Every PR that changes `src/`, `bin/`, `skills/`, or `hooks/` must include a paste of `node --test` plus its passing output. The repo dogfoods itself.

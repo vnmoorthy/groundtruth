@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>groundtruth — a Stop hook for Claude Code</title>
+<meta name="description" content="Stop hook for Claude Code that physically refuses to let the agent end a turn on a completion claim without verification in the same turn. MIT, zero deps, one paste install.">
+<meta property="og:title" content="groundtruth — a Stop hook for Claude Code">
+<meta property="og:description" content="Block the agent from saying done without evidence. Calibrated against 1,272 real turns. MIT.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://vnmoorthy.github.io/groundtruth/">
+<meta property="og:image" content="https://vnmoorthy.github.io/groundtruth/logo.svg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="groundtruth — a Stop hook for Claude Code">
+<meta name="twitter:description" content="Block the agent from saying done without evidence. Calibrated against 1,272 real turns. MIT.">
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --code: #1f242b;
+    --text: #e6edf3;
+    --dim: #8b949e;
+    --border: #30363d;
+    --accent: #7c3aed;
+    --accent-2: #3b82f6;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  code { background: var(--code); padding: 1px 6px; border-radius: 3px; font-size: 0.92em; }
+  pre {
+    background: var(--code); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 16px; overflow: auto; font-size: 13px; line-height: 1.5;
+  }
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* Hero */
+  header.hero {
+    text-align: center; padding: 72px 24px 56px;
+    background:
+      radial-gradient(ellipse at top, rgba(124, 58, 237, 0.12), transparent 50%),
+      radial-gradient(ellipse at bottom, rgba(59, 130, 246, 0.08), transparent 50%);
+  }
+  .logo { width: 96px; height: 96px; margin: 0 auto 16px; display: block; }
+  .hero h1 { font-size: 56px; margin: 0 0 8px; letter-spacing: -0.02em; font-weight: 700; }
+  .hero .tag { font-size: 20px; color: var(--dim); max-width: 640px; margin: 0 auto 32px; }
+  .badges { margin: 16px 0 24px; }
+  .badges img { vertical-align: middle; margin: 0 3px; }
+  .install {
+    display: inline-block; max-width: 720px; width: 100%;
+    background: var(--code); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 20px; text-align: left; font-size: 14px;
+    overflow-x: auto; white-space: nowrap;
+  }
+  .install code { background: transparent; padding: 0; color: var(--text); }
+  .cta {
+    display: inline-flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; justify-content: center;
+  }
+  .btn {
+    display: inline-block; padding: 10px 18px; border-radius: 6px;
+    background: var(--accent); color: #fff; font-weight: 500; font-size: 14px;
+    border: 1px solid transparent; transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; text-decoration: none; }
+  .btn.secondary { background: transparent; border-color: var(--border); color: var(--text); }
+
+  /* Sections */
+  section { padding: 56px 24px; border-top: 1px solid var(--border); }
+  section h2 {
+    font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em;
+  }
+  section h2 .muted { color: var(--dim); font-weight: 400; font-size: 16px; margin-left: 8px; }
+  section p { font-size: 16px; max-width: 760px; }
+
+  /* Demo */
+  .demo {
+    background: var(--code); border-left: 3px solid var(--accent);
+    padding: 16px 20px; margin: 16px 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13.5px;
+  }
+  .demo .label { color: var(--accent); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .demo .text { color: var(--text); }
+  .demo.block { border-left-color: var(--red); }
+  .demo.block .label { color: var(--red); }
+  .demo.allow { border-left-color: var(--green); }
+  .demo.allow .label { color: var(--green); }
+  .demo .meta { font-size: 12px; color: var(--dim); margin-top: 8px; font-style: italic; }
+
+  /* Numbers */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 24px 0; }
+  @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; text-align: center;
+  }
+  .stat .num { font-size: 36px; font-weight: 700; color: var(--accent); }
+  .stat .num.green { color: var(--green); }
+  .stat .label { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
+  /* Calibration table */
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; }
+  th, td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+  th { color: var(--dim); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  td.win { color: var(--green); font-weight: 600; }
+
+  /* Playground embed */
+  .playground-cta {
+    background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(59,130,246,0.08));
+    border: 1px solid var(--accent); border-radius: 12px;
+    padding: 32px; text-align: center; margin: 32px 0;
+  }
+  .playground-cta h3 { font-size: 24px; margin: 0 0 8px; }
+  .playground-cta p { margin: 0 auto 16px; color: var(--text); }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 24px; text-align: center; color: var(--dim); font-size: 13px;
+  }
+  footer .links { margin-bottom: 12px; }
+  footer .links a { margin: 0 8px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="container">
+    <img src="logo.svg" alt="groundtruth logo" class="logo">
+    <h1>groundtruth</h1>
+    <p class="tag">A Stop hook for Claude Code that <strong>physically refuses</strong> to let the agent end a turn on a completion claim unless the same turn contains verification.</p>
+    <p class="badges">
+      <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
+      <img src="https://img.shields.io/badge/tests-131%20passing-brightgreen" alt="131 tests passing">
+      <img src="https://img.shields.io/badge/node-%E2%89%A518-43853d" alt="Node 18+">
+      <img src="https://img.shields.io/badge/zero-deps-7c3aed" alt="zero deps">
+    </p>
+    <div class="install"><code>curl -fsSL https://raw.githubusercontent.com/vnmoorthy/groundtruth/main/install.sh | bash</code></div>
+    <div class="cta">
+      <a class="btn" href="playground.html">Try it without installing →</a>
+      <a class="btn secondary" href="https://github.com/vnmoorthy/groundtruth">View on GitHub</a>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="container">
+    <h2>What happens, in vivo</h2>
+    <p>I asked <code>claude -p</code> to create <code>hello.txt</code> and end its turn with the word <code>Done.</code> Without groundtruth, the session ends on the first "Done." With groundtruth installed, this happens:</p>
+
+    <div class="demo block">
+      <div class="label">Turn 1 — agent</div>
+      <div class="text">"Please approve the file write request so I can create <code>hello.txt</code>. Done."</div>
+      <div class="meta">→ Stop hook fires. Sees a <code>Done.</code> claim with no verification artifact. Returns <code>{"decision":"block","reason":"…"}</code>.</div>
+    </div>
+
+    <div class="demo allow">
+      <div class="label">Turn 2 — agent (forced by the block)</div>
+      <div class="text">"I attempted to create <code>hello.txt</code> with the content <code>hello</code>. <strong>I have not verified it</strong> — all write attempts were blocked. To verify I would need write permissions to be granted, then confirmed with a Read or <code>cat</code> of the file."</div>
+      <div class="meta">→ The agent did not generate that retraction template on its own. The hook fed the gate's <code>reason</code> back to the model and the model produced a turn that satisfied the rule.</div>
+    </div>
+
+    <p style="color: var(--dim); margin-top: 24px;">That is the load-bearing user path this project exists to enforce. Every other claim about groundtruth derives from this single behavior.</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>Empirical calibration <span class="muted">on 1,272 real turns</span></h2>
+    <p>The detector was tuned against 1,272 assistant turns across 50 real Claude Code sessions from one user's <code>~/.claude/projects/</code>. Each release was driven by a re-audit of that same corpus, so the false positive rate is measured on real prose, not on benchmarks I made up.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Version</th>
+          <th>Findings on the same 1,272 turns</th>
+          <th>What the false positives looked like</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>0.1.0</code></td>
+          <td>30</td>
+          <td>mostly academic prose ("the paper is ready", "citations resolved")</td>
+        </tr>
+        <tr>
+          <td><code>0.1.2</code></td>
+          <td>5</td>
+          <td>paper-writing turns that contained <code>python</code> fenced blocks</td>
+        </tr>
+        <tr>
+          <td><code>0.1.3</code></td>
+          <td class="win">0–1</td>
+          <td>one ambiguous "successfully added 20,000 more" phrasing</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="stats">
+      <div class="stat"><div class="num green">131</div><div class="label">tests passing</div></div>
+      <div class="stat"><div class="num">1,272</div><div class="label">turns calibrated against</div></div>
+      <div class="stat"><div class="num">8</div><div class="label">claim frames</div></div>
+      <div class="stat"><div class="num">27</div><div class="label">exclusion patterns</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>Compose with what you already have</h2>
+    <p>groundtruth is narrow on purpose. It does one thing. It composes below other Claude Code workflow tools rather than replacing them.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tool</th>
+          <th>What it solves</th>
+          <th>Catches mid-session claims at every Stop?</th>
+          <th>Audits past sessions?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>groundtruth</strong></td><td>Completion-claim gate</td><td class="win">yes</td><td class="win">yes (CLI + SARIF)</td></tr>
+        <tr><td><a href="https://github.com/garrytan/gstack">gstack /ship</a></td><td>End-of-task workflow</td><td>only when /ship</td><td>no</td></tr>
+        <tr><td><a href="https://github.com/obra/superpowers">obra/superpowers</a></td><td>TDD methodology</td><td>by steering, not enforcement</td><td>no</td></tr>
+        <tr><td><a href="https://github.com/decider/claude-hooks">decider/claude-hooks</a></td><td>Broad guardrails</td><td>partial</td><td>no</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>Try it now <span class="muted">no install</span></h2>
+    <div class="playground-cta">
+      <h3>Drop a session JSONL → see findings instantly</h3>
+      <p>The playground runs the entire detector + verifier + code-context filter in your browser. No install, no signup, no fetches. Drop a real Claude Code session file or use a sample.</p>
+      <a class="btn" href="playground.html">Open playground →</a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>Install in 30 seconds</h2>
+    <pre><code># install
+curl -fsSL https://raw.githubusercontent.com/vnmoorthy/groundtruth/main/install.sh | bash
+
+# verify it's wired in
+groundtruth status
+
+# audit your existing session history (no API spend)
+groundtruth audit
+
+# from this point on, every Claude Code session in every repo
+# goes through the gate
+</code></pre>
+    <p style="color: var(--dim);">Node 18 or newer. Zero new dependencies installed in your project. MIT.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="links">
+    <a href="https://github.com/vnmoorthy/groundtruth">GitHub</a>
+    <a href="playground.html">Playground</a>
+    <a href="https://github.com/vnmoorthy/groundtruth/blob/main/CHANGELOG.md">Changelog</a>
+    <a href="https://github.com/vnmoorthy/groundtruth/blob/main/ARCHITECTURE.md">Architecture</a>
+    <a href="https://github.com/vnmoorthy/groundtruth/blob/main/CONTRIBUTING.md">Contributing</a>
+    <a href="https://github.com/vnmoorthy/groundtruth/issues">Issues</a>
+  </div>
+  <div>
+    MIT licensed · v0.1.5 · zero runtime dependencies · 131 tests passing
+  </div>
+</footer>
+
+</body>
+</html>
