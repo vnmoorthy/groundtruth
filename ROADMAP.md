@@ -58,7 +58,7 @@ This section records the actual analysis behind the items above.
 
 **Design review.** README is text-heavy. The new landing page (`docs/index.html`) helps. A real screencast GIF (already drafted in `tools/demo.tape`) would close the visual gap further. Visual identity (`docs/logo.svg`) exists.
 
-**DevEx review.** Time-to-first-block was the biggest gap; `groundtruth demo` (added in v0.1.9) closes it. `groundtruth doctor` covers diagnostic. `groundtruth init` covers configuration on-ramp. `groundtruth fixture add` covers the contribution loop. The remaining gap is the playground URL not being live — that's a Pages-enable click on the user's side.
+**DevEx review.** Time-to-first-block was the biggest gap; `groundtruth demo` (added in v0.1.9) closes it. `groundtruth doctor` covers diagnostic. `groundtruth init` covers configuration on-ramp. `groundtruth fixture add` covers the contribution loop. The playground URL went live in v0.1.11 (GitHub Pages enabled, source `main` / `/docs`). A follow-up `/devex-review` audit drove the v0.1.11–v0.1.13 releases (`--help` no longer mutates state, `check` exit codes are honest, error messages now follow problem/Why/Fix shape, Discussions enabled, no-telemetry stance documented). Remaining gaps are at honest ceilings: Community needs real third-party threads (time, not commits) and DX Measurement is capped at 5/10 by `SECURITY.md`'s no-telemetry promise.
 
 **Security review.** Documented in `SECURITY.md`. Realistic threats: malicious dependency (mitigated by zero deps), compromised maintainer (mitigated by tagged releases), prompt injection in session text (mitigated by static-only regex evaluation, no eval).
 

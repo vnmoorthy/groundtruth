@@ -94,6 +94,6 @@ exit code: 0
 
 End card:
 
-    groundtruth v0.1.0
+    groundtruth v0.1.13
     One paste to install. Zero runtime deps. MIT.
     github.com/vnmoorthy/groundtruth

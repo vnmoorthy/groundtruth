@@ -117,7 +117,7 @@ Stop hook for Claude Code that blocks the agent from ending a turn on a completi
 
 Also includes a `groundtruth audit` CLI that walks past `~/.claude/projects/*/*.jsonl` files and flags unverified claims retroactively, with SARIF output for CI.
 
-MIT, zero new runtime deps (Node 18+ standard library only), 104 tests passing, single-paste installer.
+MIT, zero new runtime deps (Node 18+ standard library only), 153 tests passing, single-paste installer.
 ```
 
 ---

@@ -3,11 +3,11 @@
 # groundtruth
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![tests](https://img.shields.io/badge/tests-135%20passing-brightgreen)](test/)
+[![tests](https://img.shields.io/badge/tests-153%20passing-brightgreen)](test/)
 [![audit](https://img.shields.io/badge/audit-1k%20turns%20%2F%2027ms-3fb950)](test/perf.test.mjs)
 [![node](https://img.shields.io/badge/node-%E2%89%A518-43853d)](https://nodejs.org)
 [![claude code](https://img.shields.io/badge/claude%20code-v2.1.119%20verified-7c3aed)](docs/findings.md)
-[![status](https://img.shields.io/badge/status-v0.1.10-orange)](CHANGELOG.md)
+[![status](https://img.shields.io/badge/status-v0.1.13-orange)](CHANGELOG.md)
 [![playground](https://img.shields.io/badge/try%20it-no%20install-7c3aed)](https://vnmoorthy.github.io/groundtruth/playground.html)
 
 **Stop letting Claude Code say "done" without evidence.**
@@ -185,7 +185,7 @@ bin/
 skills/
   groundtruth/SKILL.md   The skill presented to Claude Code
 test/
-  *.test.mjs + fixtures/  104 tests, all green
+  *.test.mjs + fixtures/  153 tests, all green
 docs/findings.md     Hook surface extracted from the Claude Code binary
 ARCHITECTURE.md      What the gate enforces, what it cannot, threat model
 CHANGELOG.md         Per-release notes

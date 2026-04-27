@@ -21,9 +21,9 @@ If you cannot produce evidence, say instead: "I attempted X. I have not verified
 
 A passing run looks like:
 
-    # tests 74
+    # tests 153
     # suites 0
-    # pass 74
+    # pass 153
     # fail 0
 
 Any PR that changes `src/`, `bin/`, `skills/`, or `hooks/` must include a paste of this command plus its output in the PR description.
