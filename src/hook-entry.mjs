@@ -81,6 +81,19 @@ export async function runHook(readStdinFn = readStdin) {
     return;
   }
 
+  // If the payload has neither field we depend on, the schema may have
+  // shifted under us. Warn (don't block — fail-safe is to allow) so users
+  // notice they're degraded to no-op instead of silently failing.
+  if (!input.last_assistant_message && !input.transcript_path) {
+    process.stderr.write(
+      "groundtruth hook: payload has no last_assistant_message or transcript_path — " +
+        "Claude Code's Stop hook schema may have changed. Allowing this turn. " +
+        "If you see this repeatedly, file an issue with the payload keys you observed.\n",
+    );
+    emitAllow();
+    return;
+  }
+
   let assistantText = input.last_assistant_message || "";
   let observations = [];
 

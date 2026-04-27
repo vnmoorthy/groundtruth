@@ -40,7 +40,25 @@ const TEMPLATE = `{
 }
 `;
 
+const INIT_HELP = `groundtruth init: scaffold a starter .groundtruthrc.json
+
+usage:
+  groundtruth init [--here] [--force]
+
+flags:
+  --here, .                       Write to ./.groundtruthrc.json (default: ~/.groundtruthrc.json)
+  --force, -f                     Overwrite an existing config file
+  --help, -h                      Show this message
+
+The starter file documents the exclude_patterns / exclude_paths /
+extra_test_commands / extra_build_commands schema with examples.
+`;
+
 export async function runInit(args) {
+  if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(INIT_HELP);
+    process.exit(0);
+  }
   const here = args.includes("--here");
   const force = args.includes("--force") || args.includes("-f");
   const target = here ? resolve(".groundtruthrc.json") : join(homedir(), ".groundtruthrc.json");

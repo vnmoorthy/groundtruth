@@ -4,6 +4,30 @@ All notable changes to this project are recorded here.
 Format follows [keepachangelog.com](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [semver.org](https://semver.org).
 
+## [0.1.11] — 2026-04-27
+
+Acts on the six findings from gstack `/devex-review` (live developer-experience audit). One CRITICAL (broken playground URL), two HIGH (`--help` mutated state, `check` exit code lied), three MEDIUM. All six are now closed.
+
+### Added
+
+- **GitHub Pages enabled** — source is `main` / `/docs`. The README's playground link (`https://vnmoorthy.github.io/groundtruth/playground.html`) and landing URL now resolve. Pages was simply never turned on; the docs already lived in `/docs`. Verified: `gh api repos/vnmoorthy/groundtruth/pages` returns `"status":"built"` and `curl -sI` on both URLs returns `HTTP/2 200`.
+- **`--help` interception** on `init`, `install`, and `uninstall`. Each subcommand now prints its own usage block and exits 0 without mutating anything. Before this, `init --help` overwrote `~/.groundtruthrc.json` and `install --help` actually ran the install. The universal "show me what this does" gesture should never write files.
+
+### Changed
+
+- **`groundtruth check` exit codes are now honest.** Missing path → exit 2 with a stderr message. Path that yields zero parseable assistant turns (e.g. a `.txt` file pointed at by mistake) → exit 2 with a stderr message. Findings → exit 1. Clean → exit 0. Before this, all four cases exited 0, which silently broke `check` as a CI gate.
+- **Top-level `--help` covers the diagnostic subcommands.** New "diagnostics" section lists `doctor`, `demo`, `init`, `list-patterns`, `bench`, `stats`, `replay`, `fixture add`. Install flags also documented. Before this, half the working CLI was undiscoverable from `--help`.
+- **Stop hook warns on schema drift.** When the stdin payload has neither `last_assistant_message` nor `transcript_path`, the hook writes a one-line stderr warning and allows the turn (fail-safe preserved). Before this, a mismatched payload silently no-op'd, which would mask any future Claude Code schema change.
+- **`docs/playground.html`** footer bumped from `v0.1.4` to `v0.1.11`.
+
+### gstack `/devex-review` audit summary
+
+The live audit drove the playground URL from `https://vnmoorthy.github.io/groundtruth/...` → 404 (and from there to `200 OK` after enabling Pages). It also caught two latent CLI-correctness bugs (`--help` side effects, `check` exit codes) that no automated test would have flagged because they live at the dispatch layer between flags and side effects. The "test the actual product, don't review the description of the product" framing is what made these visible.
+
+### Test count
+
+135 tests pass (unchanged — these were CLI surface and doc changes, not source-of-truth detection logic).
+
 ## [0.1.10] — 2026-04-27
 
 Acts on both findings from gstack `/cso` security audit. Both were MEDIUM, both are now closed.

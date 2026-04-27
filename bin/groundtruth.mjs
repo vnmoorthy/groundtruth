@@ -51,6 +51,16 @@ usage:
   groundtruth status              Show install status, composition
   groundtruth version             Print version
 
+diagnostics:
+  groundtruth doctor              Check environment and surface fixable warnings
+  groundtruth demo                Walk through the gate firing on a real-shaped session
+  groundtruth list-patterns       Print every claim frame and exclusion pattern
+  groundtruth bench               Time the audit across recent sessions
+  groundtruth stats               Summarize claims/verifications across recent sessions
+  groundtruth replay <file>       Replay a session JSONL turn-by-turn
+  groundtruth init [--here]       Scaffold a starter .groundtruthrc.json
+  groundtruth fixture add <text>  Capture a sentence as a regression fixture
+
 audit flags:
   --json                          Emit JSON
   --sarif                         Emit SARIF 2.1.0 for CI integrations (GitHub code scanning, etc.)
@@ -63,12 +73,18 @@ memory-check flags:
   --transcript <path>             Session JSONL to verify against
   --lookback N                    How many recent assistant turns to check (default 5)
 
+install flags:
+  --dry-run                       Print what would happen without writing
+  --no-skill / --no-hook          Skip skill copy / hook registration
+  --with-memory-gate              Also register the PreToolUse memory hook
+
 examples:
   groundtruth audit
   groundtruth audit ~/.claude/projects/my-project
   groundtruth audit ~/.claude/projects/my-project/*.jsonl --json
   groundtruth check test/fixtures/unverified-claim.jsonl
   groundtruth memory-check MEMORY.md --transcript ~/.claude/projects/x/y.jsonl
+  groundtruth doctor
 `;
 
 function parseFlags(args) {
@@ -139,9 +155,26 @@ async function main() {
         process.stderr.write("groundtruth check: a file path is required\n");
         process.exit(2);
       }
+      // For check (a CI gate), missing or empty input is a misuse, not a pass.
+      // discoverFromArgs writes to stderr and skips bad paths; we count what
+      // it accepted versus what was requested and refuse to silently pass.
       const files = discoverFromArgs(positional);
+      if (files.length === 0) {
+        process.stderr.write(
+          `groundtruth check: no session JSONL files matched ${positional.length === 1 ? "the supplied path" : "the supplied paths"}.\n` +
+            "  Pass an existing .jsonl file, or a directory containing one.\n",
+        );
+        process.exit(2);
+      }
       const report = auditSessions(files, { includeNonCode: flags.includeNonCode });
       process.stdout.write(renderReport(report, { footer: false, explain: flags.explain }) + "\n");
+      if (report.total_turns === 0) {
+        process.stderr.write(
+          `groundtruth check: scanned ${report.files_scanned} file(s) but parsed 0 assistant turns.\n` +
+            "  This usually means the file is not a Claude Code session JSONL.\n",
+        );
+        process.exit(2);
+      }
       process.exit(report.findings.length > 0 ? 1 : 0);
       break;
     }
@@ -197,6 +230,21 @@ async function main() {
       break;
     }
     case "install": {
+      if (rest.includes("--help") || rest.includes("-h")) {
+        process.stdout.write(`groundtruth install: register the Stop hook in ~/.claude/settings.json
+
+usage:
+  groundtruth install [flags]
+
+flags:
+  --dry-run                       Print what would happen without writing
+  --no-skill                      Skip copying the skill into ~/.claude/skills/
+  --no-hook                       Skip registering the Stop hook in settings.json
+  --with-memory-gate              Also register the PreToolUse memory hook
+  --help, -h                      Show this message
+`);
+        process.exit(0);
+      }
       const opts = {
         dryRun: rest.includes("--dry-run"),
         noSkill: rest.includes("--no-skill"),
@@ -207,6 +255,18 @@ async function main() {
       break;
     }
     case "uninstall": {
+      if (rest.includes("--help") || rest.includes("-h")) {
+        process.stdout.write(`groundtruth uninstall: remove the Stop hook from ~/.claude/settings.json
+
+usage:
+  groundtruth uninstall
+
+  Removes any hook entries whose command contains 'groundtruth' from both the
+  Stop and PreToolUse arrays, and deletes ~/.claude/skills/groundtruth/.
+  Backs up settings.json before writing.
+`);
+        process.exit(0);
+      }
       await uninstallHook();
       break;
     }
